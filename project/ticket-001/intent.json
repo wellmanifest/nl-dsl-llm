@@ -70,7 +70,8 @@
         {
           "name": "examples",
           "paths": [
-            "examples/ticket_management.dsl.json"
+            "examples/ticket_management.dsl.json",
+            "examples/planfile_adoption.md"
           ]
         }
       ],
