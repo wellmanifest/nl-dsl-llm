@@ -1,0 +1,19 @@
+{
+  "circularGovernanceChecksIgnoredByValidator": [
+    "governance / enforce",
+    "governance / governance / enforce"
+  ],
+  "externalConsumers": [
+    {
+      "name": "validator-agent",
+      "repository": "subactor/validator-agent",
+      "mustRead": ".governance/required-checks.json#/requiredCheckNames",
+      "bindings": ["DIRECT_PR_REQUIRED_CHECKS", "direct-pr-registry required_checks"]
+    }
+  ],
+  "repository": "wellmanifest/nl-dsl-llm",
+  "requiredCheckNames": ["test"],
+  "schema": "new-project.required-checks/v1",
+  "version": 1,
+  "workflowFile": ".github/workflows/ci.yml"
+}
