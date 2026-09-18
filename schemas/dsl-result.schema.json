@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wellmanifest.org/schemas/nl-dsl-llm/dsl-result.schema.json",
+  "title": "Unified DSL Execution Result Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["success", "status", "data", "errors", "meta"],
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "True if command succeeded; false if validation or execution error occurred."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["OK", "CREATED", "UPDATED", "DELETED", "NOT_FOUND", "VALIDATION_ERROR", "EXECUTION_ERROR", "UNAUTHORIZED"],
+      "description": "Standardized status code."
+    },
+    "data": {
+      "description": "Result payload: list of entities, single entity, or count/summary dict."
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {"type": "string"},
+          "message": {"type": "string"},
+          "field": {"type": ["string", "null"]}
+        }
+      },
+      "description": "List of diagnostic error objects if success is false."
+    },
+    "meta": {
+      "type": "object",
+      "required": ["executionTimeMs", "sourceLayer"],
+      "properties": {
+        "executionTimeMs": {"type": "number", "minimum": 0},
+        "sourceLayer": {
+          "type": "string",
+          "enum": ["direct_dsl", "nl_fast_path", "llm_fallback"]
+        },
+        "canonicalDsl": {"type": ["string", "null"]},
+        "traceId": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

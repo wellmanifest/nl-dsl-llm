@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wellmanifest.org/schemas/nl-dsl-llm/dsl-command.schema.json",
+  "title": "Canonical DSL Command Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entity", "operation"],
+  "properties": {
+    "entity": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+$",
+      "description": "Target domain entity (e.g., ticket, task, pr, sprint, user)."
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["list", "get", "create", "update", "delete", "close", "reopen", "query", "custom"],
+      "description": "Canonical operation verb."
+    },
+    "customOperation": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+$",
+      "description": "Specific custom operation name if operation is 'custom'."
+    },
+    "arguments": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {},
+      "description": "Normalized parameters and payload for the operation."
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {},
+      "description": "Key-value filter criteria for list/query operations."
+    },
+    "idempotencyKey": {
+      "type": ["string", "null"],
+      "description": "Optional client-side idempotency key for safe retries."
+    },
+    "rawDsl": {
+      "type": ["string", "null"],
+      "description": "Exact text DSL statement if parsed from string syntax."
+    }
+  }
+}

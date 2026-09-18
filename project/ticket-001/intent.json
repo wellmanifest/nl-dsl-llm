@@ -1,0 +1,107 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-001",
+  "summary": "normative specification and reference implementation for NL-DSL-LLM",
+  "workstream": "integration",
+  "classification": {
+    "kind": "SERVICE",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "spec/**",
+    "schemas/**",
+    "standard/**",
+    "examples/**",
+    "project/ticket-001/**",
+    "project/TICKETS.md",
+    "TODO.md"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "e00bb08747237d937f560ce4f26abf4a6cd3c769",
+    "targetBranch": "main",
+    "outcome": "Deliver normative specification, schemas, standard profiles, and reference implementation for the NL-DSL-LLM pattern across interfaces (CLI shell, Web REST API, MCP).",
+    "nonGoals": [
+      "No direct remote publish or merge without review.",
+      "No external API keys hardcoded."
+    ],
+    "complexity": "L",
+    "estimatedMinutes": 60,
+    "budgets": {
+      "maxImplementationFiles": 15,
+      "maxAffectedComponents": 5,
+      "maxPublicInterfaceChanges": 3,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Define normative standard specification under spec/, schemas under schemas/, and reference implementation under standard/.",
+      "components": [
+        {
+          "name": "specification",
+          "paths": [
+            "spec/NL_DSL_LLM_SPECIFICATION.md"
+          ]
+        },
+        {
+          "name": "schemas",
+          "paths": [
+            "schemas/api-contract.schema.json",
+            "schemas/dsl-command.schema.json",
+            "schemas/dsl-result.schema.json",
+            "schemas/mcp-contract.schema.json",
+            "schemas/nl-query.schema.json"
+          ]
+        },
+        {
+          "name": "standard-reference",
+          "paths": [
+            "standard/nl_dsl_llm.py",
+            "standard/test_conformance.py"
+          ]
+        },
+        {
+          "name": "examples",
+          "paths": [
+            "examples/ticket_management.dsl.json"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [
+        "Defines standard interface parity across CLI shell, Web REST API, and MCP Server for NL-DSL-LLM."
+      ],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the commit on ticket branch."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 standard/nl_dsl_llm.py --self-test"
+        ],
+        "evidence": "Standard conformance self-test suite passes with 6/6 checks."
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "Governance gate passes with 0 errors and 0 warnings."
+      }
+    ]
+  }
+}

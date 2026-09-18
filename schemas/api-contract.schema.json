@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wellmanifest.org/schemas/nl-dsl-llm/api-contract.schema.json",
+  "title": "REST API Contract for NL-DSL-LLM",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["endpoints"],
+  "properties": {
+    "endpoints": {
+      "type": "object",
+      "required": ["dsl", "query", "schema"],
+      "properties": {
+        "dsl": {
+          "type": "object",
+          "required": ["method", "path"],
+          "properties": {
+            "method": {"const": "POST"},
+            "path": {"type": "string", "default": "/api/v1/dsl"}
+          }
+        },
+        "query": {
+          "type": "object",
+          "required": ["method", "path"],
+          "properties": {
+            "method": {"const": "POST"},
+            "path": {"type": "string", "default": "/api/v1/query"}
+          }
+        },
+        "schema": {
+          "type": "object",
+          "required": ["method", "path"],
+          "properties": {
+            "method": {"const": "GET"},
+            "path": {"type": "string", "default": "/api/v1/schema"}
+          }
+        }
+      }
+    }
+  }
+}

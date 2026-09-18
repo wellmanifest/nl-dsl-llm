@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wellmanifest.org/schemas/nl-dsl-llm/nl-query.schema.json",
+  "title": "Natural Language Query Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["query"],
+  "properties": {
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Natural language request string in Polish, English, or mixed."
+    },
+    "locale": {
+      "type": "string",
+      "enum": ["auto", "pl", "en"],
+      "default": "auto",
+      "description": "Preferred linguistic parser locale hints."
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional domain or session context (e.g. current ticket, active repo, user id)."
+    },
+    "allowLlmFallback": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to invoke Layer 3 LLM fallback if Layer 1 rule-based parser fails."
+    }
+  }
+}

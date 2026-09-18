@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wellmanifest.org/schemas/nl-dsl-llm/mcp-contract.schema.json",
+  "title": "MCP Tool Contract for NL-DSL-LLM",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["serverName", "version", "tools"],
+  "properties": {
+    "serverName": {
+      "type": "string",
+      "description": "Identifier of the MCP server (e.g., planfile-mcp, monag-mcp)."
+    },
+    "version": {
+      "type": "string"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "inputSchema"],
+        "properties": {
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "inputSchema": {"type": "object"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "scenario": "Ticket management using NL-DSL-LLM",
+  "examples": [
+    {
+      "input_natural_language": "pokaż otwarte zadania",
+      "detected_layer": "nl_fast_path",
+      "canonical_dsl": "ticket.list filter:status=\"OPEN\"",
+      "command_envelope": {
+        "entity": "ticket",
+        "operation": "list",
+        "filters": {
+          "status": "OPEN"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "input_natural_language": "dodaj zadanie 'Wdrożyć MCP serwer w planfile'",
+      "detected_layer": "nl_fast_path",
+      "canonical_dsl": "ticket.create title=\"Wdrożyć MCP serwer w planfile\"",
+      "command_envelope": {
+        "entity": "ticket",
+        "operation": "create",
+        "arguments": {
+          "title": "Wdrożyć MCP serwer w planfile"
+        },
+        "filters": {}
+      }
+    },
+    {
+      "input_natural_language": "znajdź tickety ze statusem CLOSED",
+      "detected_layer": "nl_fast_path",
+      "canonical_dsl": "ticket.list filter:status=\"CLOSED\"",
+      "command_envelope": {
+        "entity": "ticket",
+        "operation": "list",
+        "filters": {
+          "status": "CLOSED"
+        },
+        "arguments": {}
+      }
+    }
+  ]
+}
