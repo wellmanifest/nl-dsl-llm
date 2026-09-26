@@ -189,6 +189,27 @@ export class TaskandNLClient {
       latency_ms: 0.3
     };
   }
+
+  /**
+   * Route an API Menu click or form submission to canonical proc:// procedure
+   * @param {string} endpointId e.g. "service.restart" or "monitor.cpu"
+   * @param {object} formValues e.g. { target: "redis-cache", env: "prod" }
+   * @param {object} viewContext e.g. { currentRoute: "/dashboard", activeService: "redis-cache" }
+   */
+  routeApiMenuAction(endpointId, formValues = {}, viewContext = {}) {
+    const action = endpointId.startsWith('proc://')
+      ? endpointId
+      : `proc://taskand.dev/${endpointId.replace(/\./g, '/')}/v1`;
+    const target = formValues.target || viewContext.activeService || 'default';
+    const env = formValues.env || formValues.environment || 'prod';
+    return {
+      success: true,
+      resolved_uri: action,
+      bound_arguments: { ...formValues, target, env },
+      requires_confirmation: env === 'prod',
+      latency_ms: 0.1
+    };
+  }
 }
 
 export default TaskandNLClient;

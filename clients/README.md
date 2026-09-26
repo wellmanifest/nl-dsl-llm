@@ -21,6 +21,23 @@ const { uri, arguments: args, latencyMs } = await client.interpret("pokaż zuży
 
 // 2. Real-time autocomplete & Option Network DAG (<1ms)
 const { suggestions } = await client.suggest("zre", { environment: 'prod' });
+
+// 3. API Menu & Form context routing (<0.1ms)
+const route = client.routeApiMenuAction("service.restart", { target: "redis-cache" });
+```
+
+### Koru Automation Integration (Python)
+Import `KoruNLClient` into developer agents or closed-loop pipelines:
+```python
+from clients.python.nl_dsl_client import KoruNLClient
+koru = KoruNLClient()
+
+# Translate natural language to canonical koru CLI execution
+cmd1 = koru.dispatch_natural_command("weź następne zadanie z kolejki dev")
+# -> {"action": "koru.queue.next", "cli_command": "koru --queue --queue-name development"}
+
+cmd2 = koru.dispatch_natural_command("uruchom diagnostykę i napraw")
+# -> {"action": "koru.doctor", "cli_command": "koru --doctor --repair --project ."}
 ```
 
 ### nl-dsl-sh Shell Integration

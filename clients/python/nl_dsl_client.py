@@ -190,6 +190,65 @@ class NLClient:
         }
 
 
+class KoruNLClient(NLClient):
+    """Specialized client for Koru closed-loop automation and planfile queue control."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("client_id", "koru")
+        super().__init__(**kwargs)
+
+    def dispatch_natural_command(self, natural_command: str) -> Dict[str, Any]:
+        """
+        Translates natural language developer command to canonical koru CLI execution parameters.
+        Examples:
+          "uruchom diagnostykę projektu" -> {"cli_command": "koru --doctor --project .", "action": "koru.doctor"}
+          "weź następne zadanie z kolejki dev" -> {"cli_command": "koru --queue --queue-name dev", "action": "koru.queue.next"}
+          "uruchom pętlę automatyczną dla 5 zadań" -> {"cli_command": "koru --loop --max-iterations 5", "action": "koru.queue.loop"}
+          "pokaż kontekst dla ticketa PLF-042" -> {"cli_command": "koru --context --ticket PLF-042 --format json", "action": "koru.context"}
+        """
+        import re
+        clean = natural_command.lower().strip()
+        if "diagnostyk" in clean or "doctor" in clean or "napraw" in clean or "sprawdź projekt" in clean:
+            repair = "--repair" if "napraw" in clean else ""
+            return {
+                "success": True,
+                "action": "koru.doctor",
+                "cli_command": f"koru --doctor {repair} --project .".strip(),
+                "resolved_uri": "urn:koru:diagnostics:doctor",
+                "confidence": 1.0,
+            }
+        elif "następne" in clean or "weź zadanie" in clean or "kolejka" in clean or "next" in clean:
+            queue = "development" if "dev" in clean else "default"
+            return {
+                "success": True,
+                "action": "koru.queue.next",
+                "cli_command": f"koru --queue --queue-name {queue}",
+                "resolved_uri": f"urn:koru:queue:{queue}:next",
+                "confidence": 1.0,
+            }
+        elif "pętl" in clean or "loop" in clean or "automatycz" in clean:
+            num = re.search(r"\b(\d+)\b", clean)
+            max_iter = int(num.group(1)) if num else 10
+            return {
+                "success": True,
+                "action": "koru.queue.loop",
+                "cli_command": f"koru --loop --max-iterations {max_iter}",
+                "resolved_uri": "urn:koru:queue:loop",
+                "confidence": 0.95,
+            }
+        elif "kontekst" in clean or "context" in clean or "brief" in clean:
+            m = re.search(r"\b([a-z]+-\d+|\d+)\b", clean, re.I)
+            t_id = m.group(1).upper() if m else "NEXT"
+            return {
+                "success": True,
+                "action": "koru.context",
+                "cli_command": f"koru --context --ticket {t_id} --format json",
+                "resolved_uri": f"urn:koru:context:{t_id}",
+                "confidence": 0.95,
+            }
+        return self.interpret(natural_command)
+
+
 if __name__ == "__main__":
     import sys
     client = NLClient()
