@@ -1,0 +1,20 @@
+[Unit]
+Description=Paxlet NL-DSL-LLM High-Performance Runtime Daemon
+After=network.target ollama.service
+
+[Service]
+Type=simple
+User=tom
+WorkingDirectory=/home/tom/github/paxlet-com/nl-dsl-llm
+Environment=PYTHONPATH=/home/tom/github/paxlet-com/nl-dsl-llm/src
+Environment=NL_DSL_SOCKET=/run/paxlet/nl-dsl-llm.sock
+Environment=NL_DSL_PORT=50051
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStartPre=/usr/bin/mkdir -p /run/paxlet
+ExecStart=/usr/bin/python3 -m paxlet_nl_dsl_llm.server --uds /run/paxlet/nl-dsl-llm.sock --port 50051
+Restart=on-failure
+RestartSec=3s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
