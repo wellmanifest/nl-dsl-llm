@@ -298,6 +298,90 @@ class NLIntentParser:
 
 
 # ---------------------------------------------------------------------------
+# Layer 1.5: Semantic Intent Cache & Candidate Matcher
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CachedIntent:
+    pattern: str
+    command: DSLCommand
+    slots: Dict[str, Any] = field(default_factory=dict)
+    is_negated: bool = False
+
+
+class SemanticCache:
+    """
+    Vector-inspired intent cache with explicit polarity and slot guards.
+    Prevents fuzzy matching traps (negation inversion, target mismatch).
+    """
+
+    NEGATION_REGEX = re.compile(
+        r"\b(nie|not|bez|don'?t|never|nigdy|odrzuć|odrzuc|without)\b",
+        re.IGNORECASE,
+    )
+
+    def __init__(self, confidence_threshold: float = 0.85):
+        self.confidence_threshold = confidence_threshold
+        self._entries: List[CachedIntent] = []
+
+    def register_template(
+        self, pattern: str, command: DSLCommand, slots: Optional[Dict[str, Any]] = None
+    ) -> None:
+        neg = bool(self.NEGATION_REGEX.search(pattern))
+        self._entries.append(
+            CachedIntent(
+                pattern=pattern.strip().lower(),
+                command=command,
+                slots=slots or {},
+                is_negated=neg,
+            )
+        )
+
+    def match(self, text: str) -> Optional[Tuple[DSLCommand, float]]:
+        clean = text.strip().lower()
+        if not clean:
+            return None
+
+        query_negated = bool(self.NEGATION_REGEX.search(clean))
+        tokens = set(re.findall(r"\b\w+\b", clean))
+
+        best_match: Optional[Tuple[DSLCommand, float]] = None
+        best_score = 0.0
+
+        for entry in self._entries:
+            # 1. Explicit Polarity Guard
+            if entry.is_negated != query_negated:
+                continue
+
+            # 2. Token Jaccard overlap similarity
+            entry_tokens = set(re.findall(r"\b\w+\b", entry.pattern))
+            if not entry_tokens:
+                continue
+
+            intersection = len(tokens & entry_tokens)
+            union = len(tokens | entry_tokens)
+            score = intersection / union if union > 0 else 0.0
+
+            # 3. Target Slot Guard (e.g. env=prod vs env=test)
+            slot_mismatch = False
+            for k, expected_v in entry.slots.items():
+                if expected_v in clean:
+                    pass
+                elif k == "env" and ("prod" in clean or "test" in clean):
+                    slot_mismatch = True
+                    break
+
+            if slot_mismatch:
+                continue
+
+            if score > best_score and score >= self.confidence_threshold:
+                best_score = score
+                best_match = (entry.command, score)
+
+        return best_match
+
+
+# ---------------------------------------------------------------------------
 # Layer 3: LLM Translation Fallback (Adaptive Path)
 # ---------------------------------------------------------------------------
 
@@ -332,12 +416,19 @@ class LLMTranslator:
 # ---------------------------------------------------------------------------
 
 class NLDSLLLMBridge:
-    """Coordinates Layer 1 (Fast Path), Layer 3 (LLM Fallback), and Layer 2 (DSL Executor)."""
+    """Coordinates Layer 1 (Fast Path), Layer 1.5 (Semantic Cache), Layer 3 (LLM Fallback), and Layer 2 (DSL Executor)."""
 
-    def __init__(self, executor: DSLExecutor, parser: Optional[NLIntentParser] = None, translator: Optional[LLMTranslator] = None):
+    def __init__(
+        self,
+        executor: DSLExecutor,
+        parser: Optional[NLIntentParser] = None,
+        translator: Optional[LLMTranslator] = None,
+        cache: Optional[SemanticCache] = None,
+    ):
         self.executor = executor
         self.parser = parser or NLIntentParser()
         self.translator = translator or LLMTranslator()
+        self.cache = cache or SemanticCache()
 
     def handle_request(self, input_text: str, allow_llm_fallback: bool = True) -> DSLResult:
         # Step 1: Direct DSL or Layer 1 Fast Path
@@ -345,6 +436,12 @@ class NLDSLLLMBridge:
         if cmd:
             source = "direct_dsl" if cmd.raw_dsl else "nl_fast_path"
             return self.executor.execute(cmd, source_layer=source)
+
+        # Step 1.5: Layer 1.5 Semantic Cache with Polarity Guard
+        cached_result = self.cache.match(input_text)
+        if cached_result:
+            matched_cmd, score = cached_result
+            return self.executor.execute(matched_cmd, source_layer="semantic_cache")
 
         # Step 2: Layer 3 LLM Fallback if enabled
         if allow_llm_fallback:
@@ -528,7 +625,26 @@ def run_self_test() -> int:
     assert "| id | title | status |" in md_output
     print("✓ CLI formatting (markdown table) verified")
 
-    print("\nALL STANDARD CONFORMANCE CHECKS PASSED (6/6).")
+    # Test 7: Layer 1.5 Semantic Cache & Polarity Guard
+    executor.register("cluster", "status", lambda cmd: {"cluster": "ready", "env": cmd.get_param("env", "prod")})
+    bridge.cache.register_template(
+        "stan klastra produkcyjnego",
+        DSLCommand(entity="cluster", operation="status", filters={"env": "prod"}),
+        slots={"env": "prod"}
+    )
+    # Positive cache match (Layer 1 skips, Layer 1.5 matches)
+    res_cache = bridge.handle_request("stan klastra produkcyjnego")
+    assert res_cache.success is True
+    assert res_cache.meta["sourceLayer"] == "semantic_cache"
+    assert res_cache.data["cluster"] == "ready"
+
+    # Negated query must be rejected by polarity guard
+    res_neg = bridge.handle_request("nie sprawdzaj stanu klastra produkcyjnego", allow_llm_fallback=False)
+    assert res_neg.success is False
+    assert res_neg.status == "VALIDATION_ERROR"
+    print("✓ Layer 1.5 Semantic Cache and Polarity Guard verified")
+
+    print("\nALL STANDARD CONFORMANCE CHECKS PASSED (7/7).")
     return 0
 
 

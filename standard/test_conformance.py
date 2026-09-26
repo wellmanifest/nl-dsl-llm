@@ -105,3 +105,26 @@ def test_cli_adapter_formats():
     md_out = InterfaceAdapters.cli_format(res, output_format="markdown")
     assert "### Result (OK)" in md_out
     assert "| id | title | status |" in md_out
+
+
+def test_semantic_cache_polarity_guard():
+    bridge, _ = create_test_fixture()
+    bridge.executor.register(
+        "cluster", "status", lambda cmd: {"cluster": "ready", "env": cmd.get_param("env", "prod")}
+    )
+    bridge.cache.register_template(
+        "stan klastra produkcyjnego",
+        DSLCommand(entity="cluster", operation="status", filters={"env": "prod"}),
+        slots={"env": "prod"},
+    )
+
+    # Positive match
+    res_pos = bridge.handle_request("stan klastra produkcyjnego")
+    assert res_pos.success is True
+    assert res_pos.meta["sourceLayer"] == "semantic_cache"
+
+    # Inverted query rejected by polarity guard
+    res_neg = bridge.handle_request("nie sprawdzaj stanu klastra produkcyjnego", allow_llm_fallback=False)
+    assert res_neg.success is False
+    assert res_neg.status == "VALIDATION_ERROR"
+

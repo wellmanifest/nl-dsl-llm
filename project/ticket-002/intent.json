@@ -1,0 +1,110 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-002",
+  "summary": "gRPC transport parity, 4-tier pipeline, and paxlet adoption case study",
+  "workstream": "integration",
+  "classification": {
+    "kind": "SERVICE",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "spec/**",
+    "proto/**",
+    "standard/**",
+    "examples/**",
+    "project/ticket-002/**",
+    "project/TICKETS.md",
+    "TODO.md"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "2040efe37b9eb898350f3fec0285a2d4e69d4e34",
+    "targetBranch": "main",
+    "outcome": "Formalize 4-tier architecture with Layer 1.5 Semantic Cache, add high-performance gRPC IPC definition, update reference standard and conformance test suite, and provide paxlet runtime adoption case study.",
+    "nonGoals": [
+      "No direct push or merge to main without approval.",
+      "No remote API keys hardcoded."
+    ],
+    "complexity": "L",
+    "estimatedMinutes": 60,
+    "budgets": {
+      "maxImplementationFiles": 15,
+      "maxAffectedComponents": 5,
+      "maxPublicInterfaceChanges": 3,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Extend normative specification with Layer 1.5 Semantic Cache (polarity/slot guard) and Section 3.4 gRPC IPC; declare Protobuf v1 contract under proto/; add Layer 1.5 to reference standard standard/nl_dsl_llm.py and conformance tests standard/test_conformance.py; document adoption under examples/paxlet_runtime_adoption.md.",
+      "components": [
+        {
+          "name": "specification",
+          "paths": [
+            "spec/NL_DSL_LLM_SPECIFICATION.md"
+          ]
+        },
+        {
+          "name": "proto",
+          "paths": [
+            "proto/wellmanifest/nl_dsl_llm/v1/runtime.proto"
+          ]
+        },
+        {
+          "name": "standard-reference",
+          "paths": [
+            "standard/nl_dsl_llm.py",
+            "standard/test_conformance.py"
+          ]
+        },
+        {
+          "name": "examples",
+          "paths": [
+            "examples/paxlet_runtime_adoption.md"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [
+        "Adds 4th interface parity surface: gRPC IPC via paxlet.nl_dsl_llm.v1.NLRuntimeService."
+      ],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the commit on ticket branch."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 standard/nl_dsl_llm.py --self-test"
+        ],
+        "evidence": "Standard conformance self-test suite passes with 7/7 checks."
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "pytest standard/test_conformance.py"
+        ],
+        "evidence": "Pytest conformance suite passes 7/7 tests."
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "Governance check passes with 0 errors and 0 warnings."
+      }
+    ]
+  }
+}

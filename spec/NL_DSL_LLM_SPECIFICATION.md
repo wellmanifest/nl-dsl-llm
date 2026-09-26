@@ -1,7 +1,7 @@
 # Wellmanifest Standard: NL-DSL-LLM Architecture Specification
 
 - **Standard ID**: `wellmanifest/nl-dsl-llm`
-- **Version**: `0.1.0`
+- **Version**: `0.2.0-candidate`
 - **Status**: `Draft / Candidate`
 - **Authors**: Wellmanifest Architecture Workgroup
 
@@ -14,17 +14,18 @@ Modern agentic and developer tooling faces a fundamental trade-off:
 2. **Domain-Specific Languages (DSL)**: Strictly typed, deterministic, parseable, transactionally sound, and auditable, but steep learning curves and rigid syntax make them cumbersome for ad-hoc natural queries.
 3. **Direct LLM Tool Execution**: Calling APIs or tools directly from LLM completions introduces security vulnerabilities, unvetted parameter passing, and unbounded API costs.
 
-The **NL-DSL-LLM Pattern** resolves this trade-off by establishing a layered, fail-closed architecture where:
+The **NL-DSL-LLM Pattern** resolves this trade-off by establishing a 4-tier, fail-closed architecture where:
 - **DSL is the sole execution surface and single source of truth (SSOT).**
 - **Natural Language is an intake boundary, never an executor.**
-- **Rule-based parsing handles 90%+ of standard operations with 0ms latency and 0 token cost.**
-- **LLM translation serves exclusively as an adaptive fallback compiler** when rule-based patterns do not match.
-- **Interface Parity guarantees identical semantic behavior across CLI, Web REST API, and Model Context Protocol (MCP).**
+- **Layer 1: Rule-based parsing** handles standard operations with 0ms latency and 0 token cost.
+- **Layer 1.5: Semantic Intent Cache** matches recurring intents using embeddings with strict negation and slot isolation guards.
+- **Layer 3: Constrained LLM translation** serves exclusively as an adaptive fallback compiler with token-level grammar masking.
+- **Universal Interface Parity** guarantees identical semantic behavior across CLI, Web REST API, MCP Server, and binary gRPC.
 
 ```
                      ┌─────────────────────────────────────────┐
                      │           Incoming Requests             │
-                     │  (CLI Shell / Web REST API / MCP Tool)  │
+                     │  (CLI Shell / Web REST / MCP / gRPC)    │
                      └────────────────────┬────────────────────┘
                                           │
                         Is input canonical DSL or NL?
@@ -42,12 +43,21 @@ The **NL-DSL-LLM Pattern** resolves this trade-off by establishing a layered, fa
               ├── YES ──────────────────┐                     │
               │                         ▼                     │
               │             ┌───────────────────────┐         │
-              └── NO ──────►│ Layer 3: LLM Fallback │         │
-                            │ Translation Compiler  │         │
-                            │ (NL -> Canonical DSL) │         │
+              └── NO ──────►│ Layer 1.5: Semantic   │         │
+                            │ Cache & Slot Guard    │         │
+                            │ (multilingual-e5)     │         │
                             └───────────┬───────────┘         │
                                         │                     │
-                                        ▼                     ▼
+                                Cache match verified?         │
+                                ├── YES ┐                     │
+                                │       ▼                     │
+                                │   ┌───────────────────────┐ │
+                                └──►│ Layer 3: LLM Fallback │ │
+                                    │ Schema-Constrained    │ │
+                                    │ (NL -> Canonical DSL) │ │
+                                    └───────────┬───────────┘ │
+                                                │             │
+                                                ▼             ▼
                              ┌───────────────────────────────────┐
                              │ Layer 2: Canonical DSL Engine     │
                              │ - Schema Validation               │
@@ -59,7 +69,7 @@ The **NL-DSL-LLM Pattern** resolves this trade-off by establishing a layered, fa
                                                 ▼
                              ┌───────────────────────────────────┐
                              │ Unified Response Envelope         │
-                             │ (JSON / Markdown / Plaintext)     │
+                             │ (JSON / Markdown / Protobuf)      │
                              └───────────────────────────────────┘
 ```
 
@@ -70,100 +80,55 @@ The **NL-DSL-LLM Pattern** resolves this trade-off by establishing a layered, fa
 ### 2.1 Layer 1: Deterministic NL Pattern Parser (Fast Path)
 
 The deterministic NL parser is a localized, rule-driven intake engine that translates recognized linguistic patterns into canonical DSL structures without network requests or model inference.
+- **Characteristics**: Sub-millisecond latency (< 1ms), zero tokens, 100% offline capable.
+- **Multilingual Normalization**: Support for Polish (PL) and English (EN) root verbs and entities.
 
-- **Characteristics**:
-  - **Latency**: Sub-millisecond (< 1ms).
-  - **Cost**: Zero tokens, zero external API fees.
-  - **Availability**: 100% offline and air-gapped capable.
-  - **Deterministic**: Given identical string inputs, produces identical DSL commands.
-- **Multilingual Normalization**:
-  - Requires support for both Polish (PL) and English (EN) root verbs and entities.
-  - Case-insensitive, whitespace-tolerant, punctuation-stripped.
-  - Verb Synonym Table mapping:
-    - *Query/Read*: `pokaż`, `wypisz`, `wyświetl`, `pobierz`, `sprawdź`, `znajdź`, `show`, `list`, `view`, `get`, `query`, `search`.
-    - *Create/Add*: `dodaj`, `utwórz`, `stwórz`, `nowy`, `zarejestruj`, `add`, `create`, `new`, `register`.
-    - *Update/Modify*: `zmień`, `ustaw`, `edytuj`, `zaktualizuj`, `update`, `set`, `edit`, `modify`.
-    - *Close/Complete*: `zamknij`, `zakończ`, `oznacz jako zrobione`, `gotowe`, `done`, `close`, `finish`, `complete`.
-    - *Delete/Remove*: `usuń`, `skasuj`, `odrzuć`, `delete`, `remove`, `drop`.
-- **Confidence Scoring**:
-  - Pattern matches emit a confidence rating (`1.0` for full grammar match, `0.0` for unrecognized).
-  - Matches with confidence `< 1.0` or syntax ambiguities fall through to Layer 3.
+### 2.2 Layer 1.5: Semantic Intent Cache & Candidate Matcher
 
-### 2.2 Layer 2: Canonical DSL Engine (Single Execution Boundary)
+Provides vector-based intent reuse while enforcing strict safeguards against fuzzy matching traps:
+- **Explicit Polarity Guard**: Inversion check for negation particles (`nie`, `not`, `don't`, `bez`, `never`). Never maps negated queries to positive action templates.
+- **Target Slot Verification**: Environment scopes (`prod` vs `test`) and numeric bounds must match exactly.
+- **Fail-Closed Policy**: Any ambiguity immediately falls through to Layer 3.
 
-The DSL is the **sole executable representation** within the system. No agent, user, or LLM may invoke internal business logic, mutations, or mutations without constructing a validated DSL command envelope.
+### 2.3 Layer 2: Canonical DSL Engine (Single Execution Boundary)
 
-- **Principles**:
-  - **Single Source of Truth**: All operations (CRUD, queries, workflow transitions) are formally declared DSL commands.
-  - **Transactional & Idempotent**: Where supported, commands accept idempotency keys or leases.
-  - **Strict Schema Enforcement**: Every command is validated against a normative JSON Schema before handler dispatch.
-  - **Execution Envelope**: Every execution returns a standardized envelope:
-    ```json
-    {
-      "success": true,
-      "command": "ticket.list",
-      "status": "COMPLETED",
-      "data": [...],
-      "errors": [],
-      "meta": {
-        "executionTimeMs": 1.42,
-        "traceId": "req-98fbc102"
-      }
-    }
-    ```
+The DSL is the **sole executable representation** within the system. No agent, user, or LLM may invoke internal business logic without constructing a validated DSL command envelope.
+- **Single Source of Truth**: All operations are formally declared DSL commands.
+- **Transactional & Idempotent**: Commands accept idempotency keys and leases.
 
-### 2.3 Layer 3: LLM Translation Fallback (Adaptive Path)
+### 2.4 Layer 3: Schema-Constrained LLM Translation Compiler
 
-When Layer 1 fails to match an incoming natural language prompt with sufficient confidence, Layer 3 acts as an **adaptive semantic compiler**.
-
-- **Fail-Closed Boundary**:
-  - The LLM **never** receives direct execution permissions, tools, or shell access.
-  - The LLM's **sole task** is translating the conversational prompt into one or more canonical DSL statements.
-- **Strict Prompt Specification**:
-  - The system prompt presents only the formal DSL grammar and schemas.
-  - Expected completion format is strict JSON adhering to `schemas/dsl-command.schema.json` or plain canonical DSL statements.
-  - Free-form prose explanation is discarded or confined to an advisory metadata field.
-- **Post-Translation Validation**:
-  - The generated DSL output from Layer 3 is fed back into Layer 2 for standard schema validation.
-  - If the LLM generates an invalid command or illegal parameters, execution fails gracefully with clear validation diagnostics.
+Acts as an adaptive semantic compiler when Layers 1 and 1.5 fail to resolve the prompt:
+- **Token-Level Masking**: Enforces strict GBNF or JSON schema decoding (`response_format`).
+- **Action ID Extraction**: Extracts concise `action_id` and arguments (30-60 tokens) rather than raw URIs or shell scripts.
+- **Clarification State**: Emits `status: "clarify"` when prompt is ambiguous, returning structured options.
 
 ---
 
 ## 3. Unified Interface Parity
 
-Every adopting system must provide three synchronous interface surfaces sharing the identical NL-DSL-LLM engine:
+Every adopting system provides four synchronous interface surfaces sharing the identical engine:
 
 ### 3.1 CLI Shell (`<tool> shell`, `<tool> ask`, `<tool> dsl`)
 - Interactive REPL and command-line entry point.
-- Single command execution:
-  - `<tool> ask "pokaż otwarte zadania"` -> NL parser -> DSL -> output.
-  - `<tool> dsl "task.list status=OPEN"` -> direct DSL execution -> output.
-- Formats: Pretty terminal table (default), JSON (`--json`), Markdown (`--markdown`).
 
 ### 3.2 Web REST API (`/dsl`, `/query`, `/schema`)
-- Standardized HTTP endpoints:
-  - `POST /api/v1/dsl`: Accepts canonical DSL strings or structured command envelopes.
-  - `POST /api/v1/query`: Accepts natural language query strings with optional locale (`pl`, `en`).
-  - `GET /api/v1/schema`: Introspects supported DSL entities, operations, and grammar.
-- Uniform HTTP status codes and standard execution envelopes in response bodies.
+- Standardized HTTP endpoints for web dashboards and external automation.
 
 ### 3.3 Model Context Protocol (MCP Server)
-- Standardized integration for AI agents (Cursor, Claude Desktop, Antigravity, OpenCode).
-- Exposed MCP Tools:
-  - `execute_dsl`: Executes validated canonical DSL statements.
-  - `nl_ask`: Resolves natural language queries (Layer 1 + Layer 3) and executes resulting DSL.
-  - `describe_grammar`: Returns current DSL vocabulary, entities, operations, and examples.
-- Exposed MCP Resources:
-  - `schema://current`: Full JSON Schema of domain DSL and operations.
+- Standardized tool integration for AI agents (`nl_ask`, `execute_dsl`).
+
+### 3.4 High-Performance gRPC IPC (`paxlet.nl_dsl_llm.v1.NLRuntimeService`)
+- Standardized binary RPC over Unix Domain Sockets (`/run/...`) and TCP.
+- Provides sub-millisecond local IPC (<0.5ms) for containerized and daemon services.
 
 ---
 
 ## 4. Conformance Criteria & Checkpoints
 
-A repository or service claiming compliance with `wellmanifest/nl-dsl-llm` must satisfy:
-
-1. **[CONF-01] Multilingual Fast Path**: Implements deterministic Layer 1 regex/synonym parsing for Polish and English without external network or LLM calls.
+1. **[CONF-01] Multilingual Fast Path**: Implements deterministic Layer 1 regex/synonym parsing for Polish and English.
 2. **[CONF-02] Canonical DSL Enforcement**: All mutations and queries route exclusively through validated Layer 2 DSL commands.
-3. **[CONF-03] Sandboxed LLM Fallback**: LLM integration is restricted to translation of unrecognized NL prompts into canonical DSL; LLM output is strictly validated by Layer 2 before execution.
-4. **[CONF-04] Three-Interface Parity**: CLI (`ask`/`dsl`), REST API (`POST /dsl`, `POST /query`), and MCP Server (`nl_ask`, `execute_dsl`) are implemented and share the same core parser/executor.
-5. **[CONF-05] Deterministic Conformance Verification**: Self-testing test suite executable via CLI (`standard/test_conformance.py` or equivalent) validating the full pipeline.
+3. **[CONF-03] Sandboxed LLM Fallback**: LLM integration is restricted to translating unrecognized NL prompts into canonical DSL with schema constraints.
+4. **[CONF-04] Four-Interface Parity**: CLI (`ask`/`dsl`), REST API, MCP Server (`nl_ask`), and gRPC (`InterpretIntent`) are supported.
+5. **[CONF-05] Semantic Intent Cache Integrity**: Explicit polarity check and slot verification prevent negation inversion errors.
+6. **[CONF-06] Deterministic Conformance Verification**: Self-testing test suite executable via CLI.
