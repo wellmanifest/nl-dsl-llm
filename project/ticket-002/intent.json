@@ -15,7 +15,8 @@
     "examples/**",
     "project/ticket-002/**",
     "project/TICKETS.md",
-    "TODO.md"
+    "TODO.md",
+    ".github/workflows/ci.yml"
   ],
   "forbiddenPaths": [
     "project/ticket-*/user-*.md"
@@ -60,13 +61,21 @@
           "name": "standard-reference",
           "paths": [
             "standard/nl_dsl_llm.py",
-            "standard/test_conformance.py"
+            "standard/test_conformance.py",
+            "standard/domain_showcase.py"
           ]
         },
         {
           "name": "examples",
           "paths": [
-            "examples/paxlet_runtime_adoption.md"
+            "examples/paxlet_runtime_adoption.md",
+            "examples/domain_adoption_matrix.md"
+          ]
+        },
+        {
+          "name": "ci",
+          "paths": [
+            ".github/workflows/ci.yml"
           ]
         }
       ],
@@ -100,6 +109,13 @@
       },
       {
         "criterion": "AC-03",
+        "commands": [
+          "python3 standard/domain_showcase.py"
+        ],
+        "evidence": "Multi-domain showcase verifies Taskand, Clonerd, SRE, and Voice-CLI execution."
+      },
+      {
+        "criterion": "AC-04",
         "commands": [
           "./project/governance-check.sh"
         ],
