@@ -35,3 +35,4 @@ and Qwen3.5-0.8B quantized in GGUF Q4_K_M via `llama.cpp`.
 - Default recommended: **Qwen3.5-2B** for full operational robustness.
 - Low-memory / ultra-fast router: **Qwen3.5-0.8B** where latency P95 < 1s is required.
 - [gRPC Runtime Feature](../FEATURE/GRPC_RUNTIME_SERVICE.md)
+- [VPS Model Matrix Evaluation](VPS_MODEL_SELECTION_AND_BENCHMARK.md)

@@ -85,6 +85,7 @@
             "docs/README.md",
             "docs/FEATURE/GRPC_RUNTIME_SERVICE.md",
             "docs/ANALYSIS/QWEN_DUAL_MODEL_EVALUATION.md",
+            "docs/ANALYSIS/VPS_MODEL_SELECTION_AND_BENCHMARK.md",
             "tests/test_suite.py"
           ]
         }

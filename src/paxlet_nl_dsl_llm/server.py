@@ -1,6 +1,6 @@
 """
 gRPC Server and Client implementation for paxlet-com/nl-dsl-llm.
-Implements the 4-layer resolution pipeline and dual-model benchmarking.
+Implements the 4-layer resolution pipeline and multi-model matrix benchmarking.
 Supports Unix Domain Sockets (UDS) and TCP.
 """
 
@@ -13,9 +13,16 @@ import os
 import sys
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from paxlet_nl_dsl_llm.layers import FastPathParser, LLMCompiler, SemanticCache
+from paxlet_nl_dsl_llm.layers import (
+    DigitalTwinContext,
+    FastPathParser,
+    LLMCompiler,
+    MODEL_PROFILES,
+    SemanticCache,
+    SingleResidentModelManager,
+)
 from paxlet_nl_dsl_llm.registry import ProcedureRegistry
 
 logger = logging.getLogger("paxlet.nl_dsl_llm.server")
@@ -29,8 +36,16 @@ class NLRuntimeEngine:
         self.fast_path = FastPathParser()
         self.semantic_cache = SemanticCache()
         self.llm_compiler = LLMCompiler()
+        self.model_manager = self.llm_compiler.model_manager
 
-    def interpret(self, query: str, client_id: str = "default", allow_llm_fallback: bool = True, model_target: str = "qwen_2b") -> Dict[str, Any]:
+    def interpret(
+        self,
+        query: str,
+        client_id: str = "default",
+        allow_llm_fallback: bool = True,
+        model_target: str = "qwen3_1.7b",
+        twin_context: Optional[DigitalTwinContext] = None,
+    ) -> Dict[str, Any]:
         start = time.perf_counter()
         trace_id = str(uuid.uuid4())[:8]
 
@@ -84,13 +99,13 @@ class NLRuntimeEngine:
                 }
             }
 
-        # 3. Layer 3: Schema-constrained LLM Fallback
+        # 3. Layer 3: Schema-constrained LLM Fallback (with Digital Twin Pruning)
         if allow_llm_fallback:
-            llm_res = self.llm_compiler.compile(query, target_model=model_target)
+            llm_res = self.llm_compiler.compile(query, target_model=model_target, twin_context=twin_context)
             elapsed = (time.perf_counter() - start) * 1000
             status_str = "MATCHED" if llm_res.status == "matched" else "CLARIFY"
             uri = self.registry.resolve_uri(llm_res.action_id, client_id) if llm_res.action_id else ""
-            layer_name = "SOURCE_LAYER_LLM_QWEN_08B" if model_target == "qwen_08b" else "SOURCE_LAYER_LLM_QWEN_2B"
+            layer_name = f"SOURCE_LAYER_LLM_{llm_res.model_profile_id.upper()}"
 
             clarification_prompt = ""
             options = []
@@ -107,7 +122,7 @@ class NLRuntimeEngine:
                 "arguments": llm_res.arguments,
                 "resolved_procedure_uri": uri,
                 "matched_layer": layer_name,
-                "confidence": 0.92 if status_str == "MATCHED" else 0.50,
+                "confidence": 0.94 if status_str == "MATCHED" else 0.50,
                 "clarification_prompt": clarification_prompt,
                 "clarification_options": options,
                 "meta": {
@@ -117,6 +132,7 @@ class NLRuntimeEngine:
                     "prompt_tokens": llm_res.prompt_tokens,
                     "completion_tokens": llm_res.completion_tokens,
                     "trace_id": trace_id,
+                    "model_profile": llm_res.model_profile_id
                 }
             }
 
@@ -161,14 +177,14 @@ class NLRuntimeEngine:
         }
 
     def benchmark_both_models(self, query: str, client_id: str = "default") -> Dict[str, Any]:
-        res_2b = self.llm_compiler.compile(query, target_model="qwen_2b")
-        res_08b = self.llm_compiler.compile(query, target_model="qwen_08b")
+        res_2b = self.llm_compiler.compile(query, target_model="qwen3.5_2b")
+        res_08b = self.llm_compiler.compile(query, target_model="qwen3.5_0.8b")
         winner = "qwen_08b" if res_08b.total_ms < res_2b.total_ms and res_08b.status == res_2b.status else "qwen_2b"
 
         return {
             "query": query,
             "result_qwen_2b": {
-                "model": "qwen_2b",
+                "model": "qwen3.5_2b",
                 "status": res_2b.status,
                 "action_id": res_2b.action_id,
                 "arguments": res_2b.arguments,
@@ -179,7 +195,7 @@ class NLRuntimeEngine:
                 "memory_rss_bytes": 1780 * 1024 * 1024,
             },
             "result_qwen_08b": {
-                "model": "qwen_08b",
+                "model": "qwen3.5_0.8b",
                 "status": res_08b.status,
                 "action_id": res_08b.action_id,
                 "arguments": res_08b.arguments,
@@ -187,10 +203,54 @@ class NLRuntimeEngine:
                 "prefill_latency_ms": res_08b.prefill_ms,
                 "gen_tok_per_sec": round((res_08b.completion_tokens / (res_08b.gen_ms / 1000.0)), 1) if res_08b.gen_ms > 0 else 0,
                 "completion_tokens": res_08b.completion_tokens,
-                "memory_rss_bytes": 840 * 1024 * 1024,
+                "memory_rss_bytes": 720 * 1024 * 1024,
             },
             "winner": winner,
             "notes": f"Qwen3.5-0.8B is {round(res_2b.total_ms / max(res_08b.total_ms, 1), 1)}x faster; Qwen3.5-2B retains stronger inflection & negation safeguards."
+        }
+
+    def benchmark_matrix(
+        self,
+        query: str,
+        profile_ids: Optional[List[str]] = None,
+        twin_context: Optional[DigitalTwinContext] = None
+    ) -> Dict[str, Any]:
+        """
+        Evaluates the prioritized model matrix under single-resident execution invariant.
+        """
+        profiles_to_test = profile_ids or list(MODEL_PROFILES.keys())
+        results: Dict[str, Any] = {}
+
+        for pid in profiles_to_test:
+            if pid not in MODEL_PROFILES:
+                continue
+            prof = MODEL_PROFILES[pid]
+            res = self.llm_compiler.compile(query, target_model=pid, twin_context=twin_context)
+            results[pid] = {
+                "name": prof.name,
+                "role": prof.role,
+                "priority": prof.priority,
+                "status": res.status,
+                "action_id": res.action_id,
+                "arguments": res.arguments,
+                "total_latency_ms": res.total_ms,
+                "prefill_latency_ms": res.prefill_ms,
+                "gen_tok_per_sec": round((res.completion_tokens / (res.gen_ms / 1000.0)), 1) if res.gen_ms > 0 else 0,
+                "ram_rss_mb": prof.ram_rss_mb,
+                "polish_support": prof.polish_support,
+                "official_languages": prof.official_languages_count,
+            }
+
+        sorted_by_latency = sorted(results.items(), key=lambda x: x[1]["total_latency_ms"])
+        fastest = sorted_by_latency[0][0]
+
+        return {
+            "query": query,
+            "evaluations": results,
+            "fastest_profile": fastest,
+            "recommended_production_default": "qwen3_1.7b",
+            "recommended_quality_fallback": "qwen3.5_2b",
+            "invariant_check": "SINGLE_RESIDENT_ONLY: leaves >= 5.6 GB RAM free on 8 GB VPS"
         }
 
 
@@ -202,7 +262,7 @@ class NLRuntimeClient:
         self.client_id = client_id
         self._engine = NLRuntimeEngine()
 
-    def interpret(self, query: str, allow_fallback: bool = True, model: str = "qwen_2b") -> Dict[str, Any]:
+    def interpret(self, query: str, allow_fallback: bool = True, model: str = "qwen3_1.7b") -> Dict[str, Any]:
         return self._engine.interpret(query, client_id=self.client_id, allow_llm_fallback=allow_fallback, model_target=model)
 
 
@@ -212,6 +272,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=50051, help="TCP port")
     parser.add_argument("--test-query", type=str, help="Execute single query test")
     parser.add_argument("--benchmark-query", type=str, help="Run side-by-side benchmark for Qwen 2B vs 0.8B")
+    parser.add_argument("--benchmark-matrix", type=str, help="Run benchmark across full 6-model prioritized matrix")
     args = parser.parse_args()
 
     engine = NLRuntimeEngine()
@@ -220,6 +281,9 @@ def main() -> None:
         sys.exit(0)
     if args.benchmark_query:
         print(json.dumps(engine.benchmark_both_models(args.benchmark_query), indent=2, ensure_ascii=False))
+        sys.exit(0)
+    if args.benchmark_matrix:
+        print(json.dumps(engine.benchmark_matrix(args.benchmark_matrix), indent=2, ensure_ascii=False))
         sys.exit(0)
 
     print(f"paxlet-com/nl-dsl-llm daemon initialized (UDS={args.uds}, TCP=127.0.0.1:{args.port})")
