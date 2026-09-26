@@ -60,13 +60,15 @@ class NLRuntimeEngine:
             action_id, args = fp_result
             elapsed = (time.perf_counter() - start) * 1000
             uri = self.registry.resolve_uri(action_id, client_id)
+            is_typo = "_typo_corrected_from" in args
+            matched_layer_str = "SOURCE_LAYER_FAST_PATH_TYPO_TOLERANT" if is_typo else "SOURCE_LAYER_FAST_PATH_REGEX"
             return {
                 "status": "MATCHED",
                 "action_id": action_id,
                 "arguments": args,
                 "resolved_procedure_uri": uri,
-                "matched_layer": "SOURCE_LAYER_FAST_PATH_REGEX",
-                "confidence": 1.0,
+                "matched_layer": matched_layer_str,
+                "confidence": 0.94 if is_typo else 1.0,
                 "clarification_prompt": "",
                 "clarification_options": [],
                 "meta": {

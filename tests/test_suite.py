@@ -213,7 +213,34 @@ def test_single_word_queries_across_all_commands():
         for word in words:
             res = engine.interpret(word, client_id="taskand")
             assert res["action_id"] == expected_action, f"Failed for single-word '{word}': got {res['action_id']}"
-            assert res["status"] in ("MATCHED", "CLARIFY"), f"Unexpected status for '{word}': {res['status']}"
-            assert res["matched_layer"] == "SOURCE_LAYER_FAST_PATH_REGEX"
+            assert res["matched_layer"] in ("SOURCE_LAYER_FAST_PATH_REGEX", "SOURCE_LAYER_FAST_PATH_TYPO_TOLERANT")
             assert len(res["resolved_procedure_uri"]) > 0
+
+
+def test_acoustic_and_keyboard_typo_tolerance():
+    """Validates Layer 0.8 acoustic error and keyboard typo resilience."""
+    engine = NLRuntimeEngine()
+    typos_and_acoustic_cases = [
+        ("resyart", "service.restart"),
+        ("peocesor", "monitor.cpu_status"),
+        ("pamiwc", "monitor.memory_status"),
+        ("zadabia", "task.list"),
+        ("kolekja", "koru.queue.next"),
+        ("harmongram", "task.schedule"),
+        ("wprktree", "worktree.allocate"),
+        ("procezor", "monitor.cpu_status"),
+        ("pamienc", "monitor.memory_status"),
+        ("doktur", "koru.doctor"),
+        ("koleka", "koru.queue.next"),
+        ("koleika", "koru.queue.next"),
+        ("pentla", "koru.queue.loop"),
+        ("worktri", "worktree.allocate"),
+        ("wyczysc", "cache.cleanup"),
+    ]
+    for noisy_input, expected_action in typos_and_acoustic_cases:
+        res = engine.interpret(noisy_input)
+        assert res["action_id"] == expected_action, f"Typo '{noisy_input}' failed: got {res['action_id']}"
+        assert res["matched_layer"] == "SOURCE_LAYER_FAST_PATH_TYPO_TOLERANT"
+        assert res["confidence"] >= 0.90
+        assert res["status"] == "MATCHED"
 

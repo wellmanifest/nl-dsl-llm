@@ -13,8 +13,51 @@ import json
 import os
 import re
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+
+# ==============================================================================
+# Layer 0.8: Acoustic & Typo Tolerance Normalizer (Damerau-Levenshtein & Phonetics)
+# ==============================================================================
+
+POLISH_PHONETIC_REPLACEMENTS = [
+    ("rz", "ż"), ("ch", "h"), ("ó", "u"),
+    ("om", "ą"), ("on", "ą"), ("em", "ę"), ("en", "ę"),
+    ("i", "j"),
+]
+
+def strip_accents(text: str) -> str:
+    nfkd = unicodedata.normalize('NFKD', text)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+def phonetic_key(word: str) -> str:
+    w = word.lower().strip()
+    for src, dst in POLISH_PHONETIC_REPLACEMENTS:
+        w = w.replace(src, dst)
+    return strip_accents(w)
+
+def damerau_levenshtein(s1: str, s2: str) -> int:
+    d = {}
+    len1 = len(s1)
+    len2 = len(s2)
+    for i in range(-1, len1 + 1):
+        d[(i, -1)] = i + 1
+    for j in range(-1, len2 + 1):
+        d[(-1, j)] = j + 1
+
+    for i in range(len1):
+        for j in range(len2):
+            cost = 0 if s1[i] == s2[j] else 1
+            d[(i, j)] = min(
+                d[(i - 1, j)] + 1,       # deletion
+                d[(i, j - 1)] + 1,       # insertion
+                d[(i - 1, j - 1)] + cost # substitution
+            )
+            if i > 0 and j > 0 and s1[i] == s2[j - 1] and s1[i - 1] == s2[j]:
+                d[(i, j)] = min(d[(i, j)], d[(i - 2, j - 2)] + cost)
+    return d[(len1 - 1, len2 - 1)]
 
 
 # ==============================================================================
@@ -129,6 +172,48 @@ class FastPathParser:
         ),
     ]
 
+    TYPO_CATALOG: Dict[str, Tuple[str, Dict[str, Any]]] = {
+        "restart": ("service.restart", {"target": "default"}),
+        "zrestartuj": ("service.restart", {"target": "default"}),
+        "reboot": ("service.restart", {"target": "default"}),
+        "procesor": ("monitor.cpu_status", {}),
+        "obciążenie": ("monitor.cpu_status", {}),
+        "pamięć": ("monitor.memory_status", {}),
+        "memory": ("monitor.memory_status", {}),
+        "wyczyść": ("cache.cleanup", {}),
+        "purge": ("cache.cleanup", {}),
+        "zadania": ("task.list", {}),
+        "tickety": ("task.list", {}),
+        "tasks": ("task.list", {}),
+        "harmonogram": ("task.schedule", {"title": "Routine health scan"}),
+        "zaplanuj": ("task.schedule", {"title": "Routine health scan"}),
+        "schedule": ("task.schedule", {"title": "Routine health scan"}),
+        "szczegóły": ("task.get", {"id": "task-001"}),
+        "inspect": ("task.get", {"id": "task-001"}),
+        "utwórz": ("task.create", {"title": "New Task"}),
+        "create": ("task.create", {"title": "New Task"}),
+        "zamknij": ("task.close", {"id": "task-001"}),
+        "zakończ": ("task.close", {"id": "task-001"}),
+        "complete": ("task.close", {"id": "task-001"}),
+        "worktree": ("worktree.allocate", {"ticket": "ticket-current"}),
+        "alokuj": ("worktree.allocate", {"ticket": "ticket-current"}),
+        "gałąź": ("worktree.allocate", {"ticket": "ticket-current"}),
+        "doctor": ("koru.doctor", {}),
+        "doktor": ("koru.doctor", {}),
+        "napraw": ("koru.doctor", {}),
+        "diagnostyka": ("koru.doctor", {}),
+        "kolejka": ("koru.queue.next", {}),
+        "następne": ("koru.queue.next", {}),
+        "pętla": ("koru.queue.loop", {}),
+        "automatyzacja": ("koru.queue.loop", {}),
+        "kontekst": ("koru.context", {}),
+        "pulls": ("pr.list", {}),
+        "tokeny": ("token.list", {}),
+        "zużycie": ("token.list", {}),
+        "procesy": ("process.list", {}),
+        "agenty": ("process.list", {}),
+    }
+
     def parse(self, text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         clean = text.strip()
         if not clean or re.search(r"\b(nie|not|don'?t|nie\s+uruchamiaj|nie\s+restartuj|nie\s+czyść)\b", clean, re.I):
@@ -148,6 +233,38 @@ class FastPathParser:
                     args["environment"] = env_match.group(1).lower()
 
                 return action_id, args
+
+        # Layer 0.8: Fuzzy acoustic and keyboard typo fallback for single words
+        tokens = clean.split()
+        if len(tokens) == 1 and len(clean) >= 3:
+            q_raw = tokens[0].lower()
+            q_phonetic = phonetic_key(q_raw)
+            best_match = None
+            min_dist = 3
+            for kw, (act_id, def_args) in self.TYPO_CATALOG.items():
+                kw_raw = kw.lower()
+                kw_phonetic = phonetic_key(kw_raw)
+
+                # Check phonetic equality (e.g. pamienc == pamięć, doktur == doktor)
+                if q_phonetic == kw_phonetic:
+                    args = dict(def_args)
+                    args["_typo_corrected_from"] = q_raw
+                    return act_id, args
+
+                # Damerau-Levenshtein distance
+                d_raw = damerau_levenshtein(q_raw, kw_raw)
+                d_phon = damerau_levenshtein(q_phonetic, kw_phonetic)
+                d_best = min(d_raw, d_phon)
+                threshold = 1 if len(kw_raw) <= 4 else 2
+                if d_best <= threshold and d_best < min_dist:
+                    min_dist = d_best
+                    best_match = (act_id, def_args)
+
+            if best_match:
+                act_id, def_args = best_match
+                args = dict(def_args)
+                args["_typo_corrected_from"] = q_raw
+                return act_id, args
 
         return None
 
