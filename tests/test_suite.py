@@ -105,3 +105,82 @@ def test_runtime_engine_routing_and_benchmarking():
     assert "qwen3_1.7b" in matrix_bench["evaluations"]
     assert "qwen3.5_2b" in matrix_bench["evaluations"]
     assert matrix_bench["recommended_production_default"] == "qwen3_1.7b"
+
+
+def test_active_learning_cache_promotion():
+    engine = NLRuntimeEngine()
+    # 1. Uncached novel query without auto-promote
+    novel_q = "zrób kopię zapasową bazy postgres"
+    res1 = engine.interpret(novel_q, auto_promote=False)
+    assert res1["status"] in ("MATCHED", "CLARIFY")
+    assert res1["matched_layer"].startswith("SOURCE_LAYER_LLM")
+
+    # Explicit promotion of verified intent
+    ok = engine.promote_intent(novel_q, "database.backup", {"target": "postgres"})
+    assert ok is True
+
+    # 2. Subsequent query hits Layer 1.5 Semantic Cache directly
+    res2 = engine.interpret(novel_q)
+    assert res2["status"] == "MATCHED"
+    assert res2["action_id"] == "database.backup"
+    assert res2["matched_layer"] == "SOURCE_LAYER_SEMANTIC_CACHE"
+
+    # 3. Test automatic promotion during interpret
+    novel_q2 = "wykonaj pełną migrację bazy danych"
+    res3 = engine.interpret(novel_q2, auto_promote=True)
+    assert res3["status"] in ("MATCHED", "CLARIFY")
+    # Query is now automatically in cache
+    res4 = engine.interpret(novel_q2)
+    assert res4["matched_layer"] == "SOURCE_LAYER_SEMANTIC_CACHE"
+
+
+def test_system_telemetry_and_digital_twin():
+    engine = NLRuntimeEngine()
+    twin = engine.observe_telemetry(environment="staging")
+    assert twin.environment == "staging"
+    assert len(twin.active_services) >= 1
+    assert "vps-01-primary" in twin.cluster_nodes
+    # Verify reading metrics without error
+    metrics = engine.telemetry.read_metrics()
+    assert "mem_total_mb" in metrics
+    assert metrics["mem_total_mb"] > 0
+
+
+def test_voice_token_stream_handler():
+    engine = NLRuntimeEngine()
+    # Streaming speech tokens from Whisper / VAD
+    voice_res = engine.stream_voice_token("zre")
+    assert "options" in voice_res
+    assert voice_res["latency_ms"] < 2.0  # sub-2ms response
+    assert len(voice_res["options"]) >= 1
+    # Check that next_options DAG is attached
+    assert len(voice_res["options"][0]["next_options"]) >= 1
+
+
+def test_federated_openapi_import():
+    engine = NLRuntimeEngine()
+    sample_openapi = {
+        "openapi": "3.0.0",
+        "paths": {
+            "/api/v1/clusters/nodes": {
+                "get": {
+                    "operationId": "list_nodes",
+                    "summary": "Pokaż listę węzłów klastra",
+                    "description": "Returns active cluster compute nodes"
+                }
+            },
+            "/api/v1/cache/flush": {
+                "post": {
+                    "operationId": "flush_cache",
+                    "summary": "Wyczyść cache klastra",
+                    "description": "Purges distributed cluster cache"
+                }
+            }
+        }
+    }
+    imported_count = engine.registry.import_openapi_schema(sample_openapi, client_id="cluster_api")
+    assert imported_count == 2
+    act = engine.registry.get("api.list_nodes")
+    assert act is not None
+    assert act.title == "Pokaż listę węzłów klastra"
+    assert act.uri_patterns["cluster_api"] == "openapi:///api/v1/clusters/nodes#GET"

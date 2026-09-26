@@ -42,6 +42,32 @@ class ProcedureRegistry:
             return default
         return act.uri_patterns.get(client_id, act.uri_patterns.get("default", default))
 
+    def import_openapi_schema(self, schema_dict: Dict[str, Any], client_id: str = "openapi") -> int:
+        """
+        Federated schema discovery: imports OpenAPI v3 path operations into ProcedureRegistry.
+        """
+        paths = schema_dict.get("paths", {})
+        count = 0
+        for path, methods in paths.items():
+            if not isinstance(methods, dict):
+                continue
+            for method, op_def in methods.items():
+                if method.lower() not in ("get", "post", "put", "delete", "patch") or not isinstance(op_def, dict):
+                    continue
+                op_id = op_def.get("operationId") or f"{method.lower()}_{path.replace('/', '_').strip('_')}"
+                summary = op_def.get("summary") or op_id
+                action_id = f"api.{op_id}"
+                self.register(ActionDef(
+                    action_id=action_id,
+                    title=summary,
+                    description=op_def.get("description", summary),
+                    aliases_pl=[summary.lower()],
+                    aliases_en=[op_id.replace("_", " ")],
+                    uri_patterns={client_id: f"openapi://{path}#{method.upper()}", "default": f"proc://api/{op_id}/v1"}
+                ))
+                count += 1
+        return count
+
     def _register_default_catalog(self) -> None:
         # 1. CPU Monitor
         self.register(ActionDef(

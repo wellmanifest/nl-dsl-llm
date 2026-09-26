@@ -22,6 +22,8 @@ from paxlet_nl_dsl_llm.layers import (
     MODEL_PROFILES,
     SemanticCache,
     SingleResidentModelManager,
+    SystemTelemetryObserver,
+    VoiceTokenStreamHandler,
 )
 from paxlet_nl_dsl_llm.registry import ProcedureRegistry
 
@@ -37,6 +39,8 @@ class NLRuntimeEngine:
         self.semantic_cache = SemanticCache()
         self.llm_compiler = LLMCompiler()
         self.model_manager = self.llm_compiler.model_manager
+        self.telemetry = SystemTelemetryObserver()
+        self.voice_handler = VoiceTokenStreamHandler()
 
     def interpret(
         self,
@@ -45,6 +49,7 @@ class NLRuntimeEngine:
         allow_llm_fallback: bool = True,
         model_target: str = "qwen3_1.7b",
         twin_context: Optional[DigitalTwinContext] = None,
+        auto_promote: bool = False,
     ) -> Dict[str, Any]:
         start = time.perf_counter()
         trace_id = str(uuid.uuid4())[:8]
@@ -106,6 +111,9 @@ class NLRuntimeEngine:
             status_str = "MATCHED" if llm_res.status == "matched" else "CLARIFY"
             uri = self.registry.resolve_uri(llm_res.action_id, client_id) if llm_res.action_id else ""
             layer_name = f"SOURCE_LAYER_LLM_{llm_res.model_profile_id.upper()}"
+
+            if auto_promote and status_str == "MATCHED" and llm_res.action_id:
+                self.semantic_cache.promote(query, llm_res.action_id, llm_res.arguments)
 
             clarification_prompt = ""
             options = []
@@ -175,6 +183,18 @@ class NLRuntimeEngine:
             "errors": [],
             "meta": {"execution_time_ms": (time.perf_counter() - start) * 1000}
         }
+
+    def promote_intent(self, query: str, action_id: str, arguments: Optional[Dict[str, Any]] = None) -> bool:
+        """Dynamically promote a verified query into Layer 1.5 Semantic Cache."""
+        return self.semantic_cache.promote(query, action_id, arguments)
+
+    def stream_voice_token(self, partial_token: str, twin_context: Optional[DigitalTwinContext] = None) -> Dict[str, Any]:
+        """Stream a partial voice token to receive real-time Option Network DAG predictions."""
+        return self.voice_handler.process_token(partial_token, twin_context=twin_context)
+
+    def observe_telemetry(self, environment: str = "prod") -> DigitalTwinContext:
+        """Observe host Linux metrics to dynamically populate Digital Twin state."""
+        return self.telemetry.observe_digital_twin(environment=environment)
 
     def benchmark_both_models(self, query: str, client_id: str = "default") -> Dict[str, Any]:
         res_2b = self.llm_compiler.compile(query, target_model="qwen3.5_2b")
