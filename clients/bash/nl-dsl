@@ -16,6 +16,7 @@ show_help() {
   echo ""
   echo "Commands:"
   echo "  ask <query>       Translate natural language query and display execution intent"
+  echo "  suggest <prefix>  Real-time autocomplete and option network DAG from Digital Twin"
   echo "  dsl <action_id>   Execute canonical DSL action"
   echo "  bench <query>     Compare execution across Qwen3.5-2B and Qwen3.5-0.8B"
   echo "  help              Show this help message"
@@ -37,6 +38,14 @@ case "${CMD}" in
     fi
     QUERY="$*"
     python3 "${PYTHON_CLIENT}" "${QUERY}"
+    ;;
+  suggest)
+    if [[ $# -lt 1 ]]; then
+      echo "Error: 'suggest' requires a partial query prefix."
+      exit 1
+    fi
+    QUERY="$*"
+    python3 "${PYTHON_CLIENT}" --suggest "${QUERY}"
     ;;
   dsl)
     if [[ $# -lt 1 ]]; then

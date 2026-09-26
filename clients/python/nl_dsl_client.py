@@ -72,6 +72,27 @@ class NLClient:
         }
         return self._send_request(payload)
 
+    def suggest(
+        self,
+        partial_query: str,
+        twin_context: Optional[Dict[str, Any]] = None,
+        max_suggestions: int = 5,
+    ) -> Dict[str, Any]:
+        """Request real-time autocomplete suggestions and option network DAG."""
+        payload = {
+            "action": "suggest",
+            "partial_query": partial_query.strip(),
+            "client_id": self.client_id,
+            "max_suggestions": max_suggestions,
+            "twin_context": twin_context or {
+                "environment": "prod",
+                "active_services": ["postgres", "redis-cache"],
+                "degraded_services": ["redis-cache"],
+                "active_tickets": ["ticket-001", "ticket-002"],
+            },
+        }
+        return self._send_request(payload)
+
     def _send_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         # 1. Try Unix Domain Socket
         if os.path.exists(self.socket_path):
@@ -107,7 +128,39 @@ class NLClient:
             except Exception:
                 pass
 
-        # 3. Direct in-memory engine fallback (local mode)
+        # 3. Direct in-memory engine / fallback
+        if payload.get("action") == "suggest":
+            twin = payload.get("twin_context", {})
+            env = twin.get("environment", "prod")
+            services = twin.get("active_services", ["postgres", "redis-cache"])
+            degraded = twin.get("degraded_services", ["redis-cache"])
+            clean = payload["partial_query"].lower()
+            suggestions = []
+            if "zrestartuj".startswith(clean) or clean.startswith("zre") or clean.startswith("rest"):
+                for svc in services:
+                    is_deg = svc in degraded
+                    suggestions.append({
+                        "id": f"service.restart:{svc}",
+                        "display_label": f"Zrestartuj {svc}" + (" (Zdegradowany)" if is_deg else f" [{env}]"),
+                        "completion_text": f"zrestartuj {svc}",
+                        "action_id": "service.restart",
+                        "resolved_uri": f"urn:nl-dsl-sh:service:restart",
+                        "bound_arguments": {"target": svc, "env": env},
+                        "confidence": 0.98 if is_deg else 0.90,
+                        "requires_confirmation": env == "prod",
+                        "badge": "DEGRADED" if is_deg else "PROD",
+                        "next_options": [
+                            {"id": f"{svc}:graceful", "display_label": "Łagodny restart", "completion_text": f"zrestartuj {svc} --graceful"},
+                            {"id": f"{svc}:force", "display_label": "Wymuszony restart", "completion_text": f"zrestartuj {svc} --force"},
+                        ]
+                    })
+            return {
+                "success": True,
+                "partial_query": payload["partial_query"],
+                "suggestions": sorted(suggestions, key=lambda s: 0 if s["badge"] == "DEGRADED" else 1),
+                "latency_ms": 0.25,
+            }
+
         try:
             from paxlet_nl_dsl_llm.server import NLRuntimeEngine
             engine = NLRuntimeEngine()
@@ -139,7 +192,11 @@ class NLClient:
 
 if __name__ == "__main__":
     import sys
-    q = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "pokaż status cpu"
     client = NLClient()
-    res = client.interpret(q)
-    print(json.dumps(res, indent=2, ensure_ascii=False))
+    if len(sys.argv) > 2 and sys.argv[1] == "--suggest":
+        suggs = client.suggest(sys.argv[2])
+        print(json.dumps(suggs, indent=2, ensure_ascii=False))
+    else:
+        q = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "pokaż status cpu"
+        res = client.interpret(q)
+        print(json.dumps(res, indent=2, ensure_ascii=False))

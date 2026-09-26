@@ -15,11 +15,19 @@ Import `TaskandNLClient` into `taskand/generated/dev/chat/taskand.dev/v1/intent.
 ```javascript
 import { TaskandNLClient } from 'paxlet-nl-dsl-llm/clients/node/taskand_nl_client.mjs';
 const client = new TaskandNLClient();
-const { uri, arguments, latencyMs } = await client.interpret("pokaż zużycie ramu");
+
+// 1. Intent interpretation
+const { uri, arguments: args, latencyMs } = await client.interpret("pokaż zużycie ramu");
+
+// 2. Real-time autocomplete & Option Network DAG (<1ms)
+const { suggestions } = await client.suggest("zre", { environment: 'prod' });
 ```
 
 ### nl-dsl-sh Shell Integration
 ```bash
+# Real-time autocomplete suggestions
+$ ./clients/bash/nl-dsl suggest "zre"
+
 # Natural language command execution
 $ ./clients/bash/nl-dsl ask "pokaż status cpu"
 

@@ -74,6 +74,60 @@ export class TaskandNLClient {
   }
 
   /**
+   * Real-time autocomplete suggestions and option network DAG
+   * @param {string} partialQuery Partial typing or streaming speech token (e.g. "zre")
+   * @param {object} [twinContext] Digital Twin environment context
+   * @returns {Promise<{success: boolean, suggestions: Array<object>, latencyMs: number}>}
+   */
+  async suggest(partialQuery, twinContext = {}) {
+    const payload = {
+      action: 'suggest',
+      partial_query: String(partialQuery).trim(),
+      client_id: 'taskand',
+      twin_context: {
+        environment: twinContext.environment || 'prod',
+        active_services: twinContext.activeServices || ['postgres', 'redis-cache'],
+        degraded_services: twinContext.degradedServices || ['redis-cache'],
+        active_tickets: twinContext.activeTickets || ['ticket-001', 'ticket-002'],
+        cluster_nodes: twinContext.clusterNodes || []
+      }
+    };
+
+    return new Promise(resolve => {
+      const socket = net.createConnection(this.socketPath);
+      let buffer = '';
+      const timer = setTimeout(() => {
+        socket.destroy();
+        resolve(this._inMemorySuggestFallback(partialQuery, twinContext));
+      }, 500);
+
+      socket.on('connect', () => {
+        socket.write(JSON.stringify(payload) + '\n');
+      });
+
+      socket.on('data', chunk => {
+        buffer += chunk.toString('utf8');
+        if (buffer.includes('\n')) socket.end();
+      });
+
+      socket.on('end', () => {
+        clearTimeout(timer);
+        try {
+          const res = JSON.parse(buffer.trim());
+          resolve(res);
+        } catch {
+          resolve(this._inMemorySuggestFallback(partialQuery, twinContext));
+        }
+      });
+
+      socket.on('error', () => {
+        clearTimeout(timer);
+        resolve(this._inMemorySuggestFallback(partialQuery, twinContext));
+      });
+    });
+  }
+
+  /**
    * Fast in-process fallback when daemon socket is unavailable
    */
   _inMemoryFallback(query) {
@@ -95,6 +149,44 @@ export class TaskandNLClient {
       arguments: {},
       sourceLayer: 'in_process_fallback',
       latencyMs: 0.1
+    };
+  }
+
+  /**
+   * Fast in-process option network generator from Digital Twin
+   */
+  _inMemorySuggestFallback(partialQuery, twinContext = {}) {
+    const clean = String(partialQuery).toLowerCase().trim();
+    const env = twinContext.environment || 'prod';
+    const services = twinContext.activeServices || ['postgres', 'redis-cache'];
+    const degraded = twinContext.degradedServices || ['redis-cache'];
+    const suggestions = [];
+
+    if ('zrestartuj'.startsWith(clean) || clean.startsWith('zre') || clean.startsWith('rest')) {
+      for (const svc of services) {
+        const isDegraded = degraded.includes(svc);
+        suggestions.push({
+          id: `service.restart:${svc}`,
+          display_label: `Zrestartuj ${svc}${isDegraded ? ' (Zdegradowany)' : ` [${env}]`}`,
+          completion_text: `zrestartuj ${svc}`,
+          action_id: 'service.restart',
+          resolved_uri: `proc://taskand.dev/service/restart/v1`,
+          bound_arguments: { target: svc, env },
+          confidence: isDegraded ? 0.98 : 0.90,
+          requires_confirmation: env === 'prod',
+          badge: isDegraded ? 'DEGRADED' : 'PROD',
+          next_options: [
+            { id: `${svc}:graceful`, display_label: 'Łagodny restart', completion_text: `zrestartuj ${svc} --graceful` },
+            { id: `${svc}:force`, display_label: 'Wymuszony restart', completion_text: `zrestartuj ${svc} --force` }
+          ]
+        });
+      }
+    }
+    return {
+      success: true,
+      partial_query: partialQuery,
+      suggestions: suggestions.sort((a, b) => (b.badge === 'DEGRADED' ? 1 : -1)),
+      latency_ms: 0.3
     };
   }
 }
