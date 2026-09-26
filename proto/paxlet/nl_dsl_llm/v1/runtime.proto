@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package paxlet.nl_dsl_llm.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/paxlet-com/nl-dsl-llm/proto/v1;nl_dsl_llm_v1";
+option java_multiple_files = true;
+option java_package = "com.paxlet.nl_dsl_llm.v1";
+
+// High-performance NL-DSL-LLM Runtime Service
+service NLRuntimeService {
+  // Interpret natural language query into validated DSL action
+  rpc InterpretIntent(InterpretIntentRequest) returns (InterpretIntentResponse);
+
+  // Directly execute a validated canonical DSL action
+  rpc ExecuteAction(ExecuteActionRequest) returns (ExecuteActionResponse);
+
+  // Compare intent interpretation across models (e.g. Qwen3.5-2B vs 0.8B)
+  rpc BenchmarkIntent(BenchmarkIntentRequest) returns (BenchmarkIntentResponse);
+
+  // Retrieve registered actions and procedures
+  rpc GetActionCatalog(GetActionCatalogRequest) returns (GetActionCatalogResponse);
+}
+
+enum IntentStatus {
+  INTENT_STATUS_UNSPECIFIED = 0;
+  INTENT_STATUS_MATCHED = 1;     // Action and arguments definitively matched
+  INTENT_STATUS_CLARIFY = 2;     // Ambiguous intent, requires user clarification
+  INTENT_STATUS_UNSUPPORTED = 3; // Intent falls outside system catalog
+  INTENT_STATUS_FAILED = 4;      // Parsing or schema validation error
+}
+
+enum SourceLayer {
+  SOURCE_LAYER_UNSPECIFIED = 0;
+  SOURCE_LAYER_FAST_PATH_REGEX = 1; // Layer 1: Rule-based regex/synonyms (<1ms, 0 tok)
+  SOURCE_LAYER_SEMANTIC_CACHE = 2;  // Layer 1.5: Embedding cache (<20ms)
+  SOURCE_LAYER_LLM_QWEN_2B = 3;     // Layer 3: Qwen3.5-2B
+  SOURCE_LAYER_LLM_QWEN_08B = 4;    // Layer 3: Qwen3.5-0.8B
+}
+
+enum ModelTarget {
+  MODEL_TARGET_DEFAULT = 0;         // Automatic selection (default: 2B)
+  MODEL_TARGET_QWEN_2B = 1;         // Explicitly route to Qwen3.5-2B
+  MODEL_TARGET_QWEN_08B = 2;        // Explicitly route to Qwen3.5-0.8B
+}
+
+message ClientContext {
+  string client_id = 1;             // e.g. "taskand", "clonerd", "nl-dsl-sh"
+  string session_id = 2;            // Active user session ID
+  string current_view = 3;          // Current UI view/step (e.g. "monitor/cpu", "api_menu")
+  string target_environment = 4;    // e.g. "prod", "test", "dev"
+  string user_locale = 5;           // e.g. "pl-PL", "en-US"
+  google.protobuf.Struct metadata = 6;
+}
+
+message InterpretIntentRequest {
+  string query = 1;                 // Raw natural language query
+  ClientContext context = 2;        // Client context and environment
+  bool allow_llm_fallback = 3;      // Permit Layer 3 fallback (default true)
+  ModelTarget model_target = 4;     // Specific model target if falling back
+  repeated string candidate_actions = 5; // Optional restriction of candidate actions
+}
+
+message ClarificationOption {
+  string action_id = 1;
+  string label = 2;                 // Human-readable option label
+  string description = 3;
+  google.protobuf.Struct default_arguments = 4;
+}
+
+message InterpretIntentResponse {
+  IntentStatus status = 1;
+  string action_id = 2;             // e.g. "monitor.cpu_status", "service.restart"
+  google.protobuf.Struct arguments = 3; // Extracted arguments
+  string resolved_procedure_uri = 4; // Expanded URI, e.g. "proc://taskand.dev/monitor/cpu/v1"
+  SourceLayer matched_layer = 5;
+  double confidence = 6;            // Confidence score 0.0 to 1.0
+  string clarification_prompt = 7;  // Clarification question if status == CLARIFY
+  repeated ClarificationOption clarification_options = 8;
+  ExecutionMeta meta = 9;
+}
+
+message ExecuteActionRequest {
+  string action_id = 1;
+  google.protobuf.Struct arguments = 2;
+  string idempotency_key = 3;
+  bool dry_run = 4;
+  ClientContext context = 5;
+}
+
+message ExecuteActionResponse {
+  bool success = 1;
+  string status_code = 2;           // "OK", "VALIDATION_FAILED", "EXECUTION_ERROR"
+  google.protobuf.Struct data = 3;
+  repeated string errors = 4;
+  ExecutionMeta meta = 5;
+}
+
+message ExecutionMeta {
+  double total_latency_ms = 1;
+  double prefill_latency_ms = 2;
+  double generation_latency_ms = 3;
+  uint32 prompt_tokens = 4;
+  uint32 completion_tokens = 5;
+  string trace_id = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+message BenchmarkResult {
+  ModelTarget model = 1;
+  string model_name = 2;
+  IntentStatus status = 3;
+  string action_id = 4;
+  google.protobuf.Struct arguments = 5;
+  double total_latency_ms = 6;
+  double prefill_latency_ms = 7;
+  double gen_tokens_per_sec = 8;
+  uint32 completion_tokens = 9;
+  uint64 memory_rss_bytes = 10;
+  bool schema_strictly_valid = 11;
+  bool exact_match = 12;
+}
+
+message BenchmarkIntentRequest {
+  string query = 1;
+  ClientContext context = 2;
+  string expected_action_id = 3;
+  google.protobuf.Struct expected_arguments = 4;
+}
+
+message BenchmarkIntentResponse {
+  string query = 1;
+  BenchmarkResult result_qwen_2b = 2;
+  BenchmarkResult result_qwen_08b = 3;
+  string winner = 4;                // "qwen_2b", "qwen_08b", "tie"
+  string notes = 5;
+}
+
+message GetActionCatalogRequest {
+  string client_id = 1;
+}
+
+message ActionDefinition {
+  string action_id = 1;
+  string title = 2;
+  string description = 3;
+  repeated string aliases_pl = 4;
+  repeated string aliases_en = 5;
+  google.protobuf.Struct parameters_schema = 6;
+  string target_uri_pattern = 7;
+}
+
+message GetActionCatalogResponse {
+  repeated ActionDefinition actions = 1;
+  string catalog_version = 2;
+}

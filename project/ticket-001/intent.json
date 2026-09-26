@@ -1,7 +1,7 @@
 {
   "schema": "new-project.intent/v3",
   "ticket": "ticket-001",
-  "summary": "normative specification and reference implementation for NL-DSL-LLM",
+  "summary": "gRPC runtime and dual Qwen benchmark suite",
   "workstream": "integration",
   "classification": {
     "kind": "SERVICE",
@@ -9,13 +9,18 @@
     "origin": "health"
   },
   "allowedPaths": [
-    "spec/**",
-    "schemas/**",
-    "standard/**",
-    "examples/**",
     "project/ticket-001/**",
+    "TODO.md",
     "project/TICKETS.md",
-    "TODO.md"
+    "pyproject.toml",
+    "Makefile",
+    ".governance/manifest.json",
+    "proto/**",
+    "src/**",
+    "tests/**",
+    "benchmarks/**",
+    "scripts/**",
+    "docs/**"
   ],
   "forbiddenPaths": [
     "project/ticket-*/user-*.md"
@@ -25,11 +30,11 @@
   "conflictsWith": [],
   "integrationTicket": null,
   "delivery": {
-    "acceptedBaseSha": "e00bb08747237d937f560ce4f26abf4a6cd3c769",
+    "acceptedBaseSha": "df507c61d49f03d34a1ac410706b1a768d7df7ce",
     "targetBranch": "main",
-    "outcome": "Deliver normative specification, schemas, standard profiles, and reference implementation for the NL-DSL-LLM pattern across interfaces (CLI shell, Web REST API, MCP).",
+    "outcome": "Deliver gRPC runtime service, normative protobuf contract, dual-model Qwen3.5 (2B vs 0.8B) benchmark harness, and documentation.",
     "nonGoals": [
-      "No direct remote publish or merge without review.",
+      "No remote push or publish without review.",
       "No external API keys hardcoded."
     ],
     "complexity": "L",
@@ -38,46 +43,55 @@
       "maxImplementationFiles": 15,
       "maxAffectedComponents": 5,
       "maxPublicInterfaceChanges": 3,
-      "maxRuntimeDependencies": 0
+      "maxRuntimeDependencies": 3
     },
     "architecture": {
       "status": "accepted",
-      "decision": "Define normative standard specification under spec/, schemas under schemas/, and reference implementation under standard/.",
+      "decision": "Implement gRPC service under src/, protobuf contract under proto/, benchmark suite under benchmarks/, and documentation under docs/.",
       "components": [
         {
-          "name": "specification",
+          "name": "protobuf-contract",
           "paths": [
-            "spec/NL_DSL_LLM_SPECIFICATION.md"
+            "proto/paxlet/nl_dsl_llm/v1/runtime.proto"
           ]
         },
         {
-          "name": "schemas",
+          "name": "packaging-and-build",
           "paths": [
-            "schemas/api-contract.schema.json",
-            "schemas/dsl-command.schema.json",
-            "schemas/dsl-result.schema.json",
-            "schemas/mcp-contract.schema.json",
-            "schemas/nl-query.schema.json"
+            "pyproject.toml",
+            "Makefile",
+            ".governance/manifest.json"
           ]
         },
         {
-          "name": "standard-reference",
+          "name": "runtime-core",
           "paths": [
-            "standard/nl_dsl_llm.py",
-            "standard/test_conformance.py"
+            "src/paxlet_nl_dsl_llm/__init__.py",
+            "src/paxlet_nl_dsl_llm/registry.py",
+            "src/paxlet_nl_dsl_llm/layers.py",
+            "src/paxlet_nl_dsl_llm/server.py"
           ]
         },
         {
-          "name": "examples",
+          "name": "benchmarks-and-scripts",
           "paths": [
-            "examples/ticket_management.dsl.json",
-            "examples/planfile_adoption.md"
+            "benchmarks/run_qwen_comparison.py",
+            "scripts/run_llama_servers.sh"
+          ]
+        },
+        {
+          "name": "documentation-and-tests",
+          "paths": [
+            "docs/README.md",
+            "docs/FEATURE/GRPC_RUNTIME_SERVICE.md",
+            "docs/ANALYSIS/QWEN_DUAL_MODEL_EVALUATION.md",
+            "tests/test_suite.py"
           ]
         }
       ],
       "responsibilityChanges": false,
       "interfaceChanges": [
-        "Defines standard interface parity across CLI shell, Web REST API, and MCP Server for NL-DSL-LLM."
+        "Expose NLRuntimeService over gRPC (Unix Domain Socket / TCP)."
       ],
       "dataChanges": [],
       "ui": {
@@ -87,21 +101,32 @@
       },
       "rollback": "Revert the commit on ticket branch."
     },
-    "runtimeDependencies": [],
+    "runtimeDependencies": [
+      "grpcio",
+      "protobuf",
+      "pydantic"
+    ],
     "validation": [
       {
         "criterion": "AC-01",
         "commands": [
-          "python3 standard/nl_dsl_llm.py --self-test"
+          "PYTHONPATH=src python3 -m pytest tests/"
         ],
-        "evidence": "Standard conformance self-test suite passes with 6/6 checks."
+        "evidence": "All unit and integration tests passing."
       },
       {
         "criterion": "AC-02",
         "commands": [
+          "PYTHONPATH=src python3 benchmarks/run_qwen_comparison.py"
+        ],
+        "evidence": "Benchmark suite evaluates Qwen3.5-2B vs 0.8B across 17 test cases."
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
           "./project/governance-check.sh"
         ],
-        "evidence": "Governance gate passes with 0 errors and 0 warnings."
+        "evidence": "Governance check passes with 0 errors and 0 warnings."
       }
     ]
   }
