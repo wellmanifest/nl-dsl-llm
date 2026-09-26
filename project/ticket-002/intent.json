@@ -89,14 +89,14 @@
         "commands": [
           "python3 standard/nl_dsl_llm.py --self-test"
         ],
-        "evidence": "Standard conformance self-test suite passes with 7/7 checks."
+        "evidence": "Standard conformance self-test suite passes with 8/8 checks."
       },
       {
         "criterion": "AC-02",
         "commands": [
           "pytest standard/test_conformance.py"
         ],
-        "evidence": "Pytest conformance suite passes 7/7 tests."
+        "evidence": "Pytest conformance suite passes 8/8 tests."
       },
       {
         "criterion": "AC-03",

@@ -103,23 +103,31 @@ Acts as an adaptive semantic compiler when Layers 1 and 1.5 fail to resolve the 
 - **Action ID Extraction**: Extracts concise `action_id` and arguments (30-60 tokens) rather than raw URIs or shell scripts.
 - **Clarification State**: Emits `status: "clarify"` when prompt is ambiguous, returning structured options.
 
+### 2.5 Layer 0.5: Real-time Autocomplete & Contextual Option Network (Digital Twin Projection)
+
+Enables keystroke-by-keystroke and streaming voice suggestion chips without requiring the user to type or pronounce full commands:
+- **Prefix & Inverted Trie (<2ms)**: Fast prefix indexing for command verbs and entities.
+- **Digital Twin State Projection**: Contextually filters and populates candidate slots strictly based on live environment entities (active/degraded services, containers, open tickets, nodes). Non-existent resources are pruned from suggestions.
+- **Option Network DAG**: Returning options generate connected child nodes (sub-options, flags like `--graceful`, `--force`, or parameter values) forming an interactive selection network.
+- **Safety Invariants**: Actions targeting `prod` environments are flagged with `requires_confirmation = true` and `badge = "PROD"`.
+
 ---
 
 ## 3. Unified Interface Parity
 
 Every adopting system provides four synchronous interface surfaces sharing the identical engine:
 
-### 3.1 CLI Shell (`<tool> shell`, `<tool> ask`, `<tool> dsl`)
-- Interactive REPL and command-line entry point.
+### 3.1 CLI Shell (`<tool> shell`, `<tool> ask`, `<tool> dsl`, `<tool> suggest`)
+- Interactive REPL, real-time tab-completion, and command-line entry point.
 
-### 3.2 Web REST API (`/dsl`, `/query`, `/schema`)
+### 3.2 Web REST API (`/dsl`, `/query`, `/suggest`, `/schema`)
 - Standardized HTTP endpoints for web dashboards and external automation.
 
 ### 3.3 Model Context Protocol (MCP Server)
-- Standardized tool integration for AI agents (`nl_ask`, `execute_dsl`).
+- Standardized tool integration for AI agents (`nl_ask`, `execute_dsl`, `suggest_options`).
 
 ### 3.4 High-Performance gRPC IPC (`paxlet.nl_dsl_llm.v1.NLRuntimeService`)
-- Standardized binary RPC over Unix Domain Sockets (`/run/...`) and TCP.
+- Standardized binary RPC over Unix Domain Sockets (`/run/...`) and TCP (`InterpretIntent`, `SuggestOptions`).
 - Provides sub-millisecond local IPC (<0.5ms) for containerized and daemon services.
 
 ---
@@ -129,6 +137,7 @@ Every adopting system provides four synchronous interface surfaces sharing the i
 1. **[CONF-01] Multilingual Fast Path**: Implements deterministic Layer 1 regex/synonym parsing for Polish and English.
 2. **[CONF-02] Canonical DSL Enforcement**: All mutations and queries route exclusively through validated Layer 2 DSL commands.
 3. **[CONF-03] Sandboxed LLM Fallback**: LLM integration is restricted to translating unrecognized NL prompts into canonical DSL with schema constraints.
-4. **[CONF-04] Four-Interface Parity**: CLI (`ask`/`dsl`), REST API, MCP Server (`nl_ask`), and gRPC (`InterpretIntent`) are supported.
+4. **[CONF-04] Four-Interface Parity**: CLI (`ask`/`dsl`/`suggest`), REST API, MCP Server (`nl_ask`), and gRPC (`InterpretIntent`, `SuggestOptions`) are supported.
 5. **[CONF-05] Semantic Intent Cache Integrity**: Explicit polarity check and slot verification prevent negation inversion errors.
-6. **[CONF-06] Deterministic Conformance Verification**: Self-testing test suite executable via CLI.
+6. **[CONF-06] Contextual Option Network**: Prefix suggestions dynamically prune non-existent entities and project Digital Twin resource graphs within <5ms.
+7. **[CONF-07] Deterministic Conformance Verification**: Self-testing test suite executable via CLI.

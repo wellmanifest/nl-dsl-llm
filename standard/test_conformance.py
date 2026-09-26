@@ -6,6 +6,7 @@ import json
 from standard.nl_dsl_llm import (
     DSLCommand,
     DSLExecutor,
+    DigitalTwinContext,
     InterfaceAdapters,
     NLDSLLLMBridge,
     NLIntentParser,
@@ -127,4 +128,30 @@ def test_semantic_cache_polarity_guard():
     res_neg = bridge.handle_request("nie sprawdzaj stanu klastra produkcyjnego", allow_llm_fallback=False)
     assert res_neg.success is False
     assert res_neg.status == "VALIDATION_ERROR"
+
+
+def test_option_network_digital_twin_projection():
+    bridge, _ = create_test_fixture()
+    twin = DigitalTwinContext(
+        environment="prod",
+        active_services=["postgres", "redis-cache"],
+        degraded_services=["redis-cache"],
+        active_tickets=["ticket-001"],
+    )
+
+    # Suggestion on partial token
+    res = bridge.suggest_options("zre", twin_context=twin)
+    assert res["success"] is True
+    suggestions = res["suggestions"]
+    assert len(suggestions) >= 2
+
+    # Degraded entity prioritized
+    first = suggestions[0]
+    assert first["bound_arguments"]["target"] == "redis-cache"
+    assert first["badge"] == "DEGRADED"
+    assert first["requires_confirmation"] is True
+    assert len(first["next_options"]) >= 2
+    assert "--graceful" in first["next_options"][0]["completion_text"]
+    assert res["latency_ms"] < 10.0
+
 

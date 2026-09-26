@@ -20,6 +20,9 @@ service NLRuntimeService {
   // Compare intent interpretation across models
   rpc BenchmarkIntent(BenchmarkIntentRequest) returns (BenchmarkIntentResponse);
 
+  // Suggest real-time autocomplete options and option network branches based on partial input and digital twin state
+  rpc SuggestOptions(SuggestOptionsRequest) returns (SuggestOptionsResponse);
+
   // Retrieve registered actions and procedures
   rpc GetActionCatalog(GetActionCatalogRequest) returns (GetActionCatalogResponse);
 }
@@ -146,3 +149,41 @@ message GetActionCatalogResponse {
   repeated ActionDefinition actions = 1;
   string catalog_version = 2;
 }
+
+message DigitalTwinContext {
+  string environment = 1;               // "prod", "stage", "dev", "local"
+  repeated string active_services = 2;  // ["postgres", "redis", "gateway"]
+  repeated string degraded_services = 3;// ["redis"]
+  repeated string active_tickets = 4;   // ["ticket-001", "ticket-002"]
+  repeated string cluster_nodes = 5;    // ["node-1", "node-2"]
+  google.protobuf.Struct custom_state = 6;
+}
+
+message SuggestOptionsRequest {
+  string partial_query = 1;             // e.g. "zre", "pokaz b", "ticket"
+  string client_id = 2;                 // "taskand", "clonerd", "nl-dsl-sh"
+  string locale = 3;                    // "pl", "en", "de", "uk"
+  int32 max_suggestions = 4;            // Default 5
+  DigitalTwinContext twin_context = 5;
+}
+
+message OptionNode {
+  string id = 1;                        // Unique option identifier
+  string display_label = 2;             // "Zrestartuj redis-cache (Zdegradowany)"
+  string completion_text = 3;           // "zrestartuj redis-cache"
+  string action_id = 4;                 // "service.restart"
+  string resolved_uri = 5;              // "proc://taskand.dev/service/restart/v1"
+  google.protobuf.Struct bound_arguments = 6; // {"target": "redis-cache", "env": "prod"}
+  double confidence = 7;                // 0.0 - 1.0
+  bool requires_confirmation = 8;       // true if env=prod or destructive
+  string badge = 9;                     // "RECOMMENDED", "PROD", "DEGRADED"
+  repeated OptionNode next_options = 10;// Sub-options / parameters (Option Network DAG)
+}
+
+message SuggestOptionsResponse {
+  bool success = 1;
+  string partial_query = 2;
+  repeated OptionNode suggestions = 3;
+  double latency_ms = 4;
+}
+

@@ -16,7 +16,8 @@ Extend the `wellmanifest/nl-dsl-llm` standard specification and reference implem
 - [x] AC-02: Add Protobuf v1 definition `proto/wellmanifest/nl_dsl_llm/v1/runtime.proto` defining `NLRuntimeService` for high-performance IPC.
 - [x] AC-03: Extend reference standard `standard/nl_dsl_llm.py` and pytest suite `standard/test_conformance.py` with `SemanticCache` (Layer 1.5) and polarity guard verification.
 - [x] AC-04: Document runtime adoption in `examples/paxlet_runtime_adoption.md`.
-- [x] AC-05: Conformance self-tests (7/7) and governance checks pass (`./project/governance-check.sh`).
+- [x] AC-05: Conformance self-tests (8/8) and governance checks pass (`./project/governance-check.sh`).
+- [x] AC-06: Real-time autocomplete and contextual Option Network engine with Digital Twin environment projection.
 
 ## Tracking boundary
 
