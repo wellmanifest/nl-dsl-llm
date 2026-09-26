@@ -184,3 +184,36 @@ def test_federated_openapi_import():
     assert act is not None
     assert act.title == "Pokaż listę węzłów klastra"
     assert act.uri_patterns["cluster_api"] == "openapi:///api/v1/clusters/nodes#GET"
+
+
+def test_single_word_queries_across_all_commands():
+    """Validates deterministic single-word resolution across 17 commands (3+ words each)."""
+    engine = NLRuntimeEngine()
+    test_cases = [
+        ("monitor.cpu_status", ["cpu", "procesor", "obciążenie"]),
+        ("monitor.memory_status", ["ram", "pamięć", "memory"]),
+        ("cache.cleanup", ["cache", "wyczyść", "purge"]),
+        ("service.restart", ["restart", "zrestartuj", "reboot"]),
+        ("task.list", ["zadania", "tickety", "tasks"]),
+        ("task.schedule", ["harmonogram", "zaplanuj", "schedule"]),
+        ("task.get", ["szczegóły", "inspect", "dane"]),
+        ("task.create", ["utwórz", "nowy", "create"]),
+        ("task.close", ["zakończ", "zamknij", "complete"]),
+        ("worktree.allocate", ["worktree", "alokuj", "gałąź"]),
+        ("koru.doctor", ["doctor", "napraw", "diagnostyka"]),
+        ("koru.queue.next", ["kolejka", "następne", "next"]),
+        ("koru.queue.loop", ["pętla", "loop", "automatyzacja"]),
+        ("koru.context", ["kontekst", "brief", "context"]),
+        ("pr.list", ["pr", "prs", "pulls"]),
+        ("token.list", ["token", "tokeny", "zużycie"]),
+        ("process.list", ["procesy", "agenty", "processes"]),
+    ]
+
+    for expected_action, words in test_cases:
+        for word in words:
+            res = engine.interpret(word, client_id="taskand")
+            assert res["action_id"] == expected_action, f"Failed for single-word '{word}': got {res['action_id']}"
+            assert res["status"] in ("MATCHED", "CLARIFY"), f"Unexpected status for '{word}': {res['status']}"
+            assert res["matched_layer"] == "SOURCE_LAYER_FAST_PATH_REGEX"
+            assert len(res["resolved_procedure_uri"]) > 0
+

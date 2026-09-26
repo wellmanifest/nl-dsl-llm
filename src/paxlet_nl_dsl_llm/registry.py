@@ -140,6 +140,199 @@ class ProcedureRegistry:
                 "taskand": "proc://taskand.dev/cache/clean/v1",
                 "nl-dsl-sh": "urn:nl-dsl-sh:cache:purge",
                 "clonerd": "cluster.cache.clean",
+                "koru": "proc://koru.dev/cache/clean/v1",
                 "default": "proc://paxlet.com/cache/clean/v1"
+            }
+        ))
+
+        # 6. Task Schedule
+        self.register(ActionDef(
+            action_id="task.schedule",
+            title="Schedule Task",
+            description="Schedule or enqueue an automated task or plan",
+            aliases_pl=["zaplanuj zadanie", "harmonogram", "kolejkuj"],
+            aliases_en=["schedule task", "plan task", "enqueue task"],
+            uri_patterns={
+                "taskand": "proc://taskand.dev/planner/schedule/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:task:schedule",
+                "clonerd": "cluster.task.schedule",
+                "koru": "proc://koru.dev/task/schedule/v1",
+                "default": "proc://paxlet.com/task/schedule/v1"
+            }
+        ))
+
+        # 7. Task Get
+        self.register(ActionDef(
+            action_id="task.get",
+            title="Get Task Details",
+            description="Inspect details, history and evidence of a specific task",
+            aliases_pl=["szczegóły zadania", "pokaż zadanie", "dane zadania"],
+            aliases_en=["task details", "inspect task", "show task details"],
+            uri_patterns={
+                "taskand": "proc://taskand.dev/task/get/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:task:get",
+                "clonerd": "cluster.task.get",
+                "koru": "proc://koru.dev/task/get/v1",
+                "default": "proc://paxlet.com/task/get/v1"
+            }
+        ))
+
+        # 8. Task Create
+        self.register(ActionDef(
+            action_id="task.create",
+            title="Create Task",
+            description="Create or initialize a new task or ticket",
+            aliases_pl=["utwórz zadanie", "nowe zadanie", "dodaj zadanie"],
+            aliases_en=["create task", "new task", "add ticket"],
+            uri_patterns={
+                "taskand": "proc://taskand.dev/task/create/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:task:create",
+                "clonerd": "cluster.task.create",
+                "koru": "proc://koru.dev/task/create/v1",
+                "default": "proc://paxlet.com/task/create/v1"
+            }
+        ))
+
+        # 9. Task Close
+        self.register(ActionDef(
+            action_id="task.close",
+            title="Close Task",
+            description="Mark a completed task as done or closed",
+            aliases_pl=["zamknij zadanie", "zakończ zadanie", "oznacz jako zrobione"],
+            aliases_en=["close task", "complete task", "finish task"],
+            uri_patterns={
+                "taskand": "proc://taskand.dev/task/close/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:task:close",
+                "clonerd": "cluster.task.close",
+                "koru": "proc://koru.dev/task/close/v1",
+                "default": "proc://paxlet.com/task/close/v1"
+            }
+        ))
+
+        # 10. Worktree Allocate
+        self.register(ActionDef(
+            action_id="worktree.allocate",
+            title="Allocate Git Worktree",
+            description="Allocate an isolated Git worktree for parallel ticket delivery",
+            aliases_pl=["alokuj worktree", "utwórz gałąź", "nowe worktree"],
+            aliases_en=["allocate worktree", "create branch", "new worktree"],
+            uri_patterns={
+                "clonerd": "cluster.worktree.allocate",
+                "taskand": "proc://taskand.dev/worktree/allocate/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:worktree:allocate",
+                "koru": "proc://koru.dev/worktree/allocate/v1",
+                "default": "cluster.worktree.allocate"
+            }
+        ))
+
+        # 11. Koru Doctor
+        self.register(ActionDef(
+            action_id="koru.doctor",
+            title="Koru Doctor Diagnosis",
+            description="Autonomous health diagnosis and self-healing verification",
+            aliases_pl=["koru doctor", "napraw środowisko", "diagnostyka"],
+            aliases_en=["doctor diagnose", "repair environment", "health check"],
+            uri_patterns={
+                "koru": "proc://koru.dev/doctor/diagnose/v1",
+                "taskand": "proc://taskand.dev/doctor/diagnose/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:koru:doctor",
+                "clonerd": "cluster.node.repair",
+                "default": "proc://koru.dev/doctor/diagnose/v1"
+            }
+        ))
+
+        # 12. Koru Queue Next
+        self.register(ActionDef(
+            action_id="koru.queue.next",
+            title="Koru Pop Next Task",
+            description="Dispatch and execute next queued autonomous task",
+            aliases_pl=["następne zadanie", "pobierz z kolejki", "kolejny krok"],
+            aliases_en=["next task", "pop queue", "run next"],
+            uri_patterns={
+                "koru": "proc://koru.dev/queue/pop/v1",
+                "taskand": "proc://taskand.dev/queue/pop/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:queue:pop",
+                "clonerd": "cluster.queue.pop",
+                "default": "proc://koru.dev/queue/pop/v1"
+            }
+        ))
+
+        # 13. Koru Queue Loop
+        self.register(ActionDef(
+            action_id="koru.queue.loop",
+            title="Koru Queue Continuous Loop",
+            description="Start autonomous continuous queue processing loop",
+            aliases_pl=["pętla zadań", "ciągłe przetwarzanie", "automatyzacja"],
+            aliases_en=["queue loop", "run loop", "continuous process"],
+            uri_patterns={
+                "koru": "proc://koru.dev/queue/loop/v1",
+                "taskand": "proc://taskand.dev/queue/loop/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:queue:loop",
+                "clonerd": "cluster.queue.loop",
+                "default": "proc://koru.dev/queue/loop/v1"
+            }
+        ))
+
+        # 14. Koru Context
+        self.register(ActionDef(
+            action_id="koru.context",
+            title="Koru Session Context",
+            description="Fetch session context, project briefs, and environment twin",
+            aliases_pl=["kontekst sesji", "stan projektu", "brief projektu"],
+            aliases_en=["session context", "project brief", "context snapshot"],
+            uri_patterns={
+                "koru": "proc://koru.dev/session/context/v1",
+                "taskand": "proc://taskand.dev/session/context/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:session:context",
+                "clonerd": "cluster.session.context",
+                "default": "proc://koru.dev/session/context/v1"
+            }
+        ))
+
+        # 15. Pull Request List
+        self.register(ActionDef(
+            action_id="pr.list",
+            title="List Pull Requests",
+            description="List and filter pull requests by review and merge status",
+            aliases_pl=["pokaż pr", "lista pull requestów", "otwarte pr"],
+            aliases_en=["list prs", "show pull requests", "open prs"],
+            uri_patterns={
+                "taskand": "proc://taskand.dev/pr/list/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:pr:list",
+                "clonerd": "cluster.pr.list",
+                "koru": "proc://koru.dev/pr/list/v1",
+                "default": "proc://paxlet.com/pr/list/v1"
+            }
+        ))
+
+        # 16. Token Quota & Usage
+        self.register(ActionDef(
+            action_id="token.list",
+            title="Token Usage Summary",
+            description="Check token quota, consumption and LLM costs",
+            aliases_pl=["zużycie tokenów", "statystyki tokenów", "stan konta tokenów"],
+            aliases_en=["token usage", "token stats", "quota usage"],
+            uri_patterns={
+                "taskand": "proc://taskand.dev/token/list/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:token:list",
+                "clonerd": "cluster.token.list",
+                "koru": "proc://koru.dev/token/list/v1",
+                "default": "proc://paxlet.com/token/list/v1"
+            }
+        ))
+
+        # 17. Process / Agent List
+        self.register(ActionDef(
+            action_id="process.list",
+            title="List Running Processes",
+            description="List active background agents and daemon processes",
+            aliases_pl=["lista procesów", "działające agenty", "procesy w tle"],
+            aliases_en=["list processes", "running agents", "background processes"],
+            uri_patterns={
+                "taskand": "proc://taskand.dev/process/list/v1",
+                "nl-dsl-sh": "urn:nl-dsl-sh:process:list",
+                "clonerd": "cluster.process.list",
+                "koru": "proc://koru.dev/process/list/v1",
+                "default": "proc://paxlet.com/process/list/v1"
             }
         ))
