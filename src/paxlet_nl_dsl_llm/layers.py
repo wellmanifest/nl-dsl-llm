@@ -27,103 +27,103 @@ class FastPathParser:
     PATTERNS: List[Tuple[re.Pattern, str, Dict[str, Any]]] = [
         # 1. CPU Monitor
         (
-            re.compile(r"\b(status\s+cpu|pokaż\s+(procesor|cpu)|użycie\s+(procesora|cpu)|show\s+cpu|cpu\s+status|check\s+load)\b|^\s*(cpu|procesor|obciążenie|load)\s*$", re.I),
+            re.compile(r"\b(status\s+cpu|pokaż\s+(procesor|cpu)|użycie\s+(procesora|cpu)|show\s+cpu|cpu\s+status|check\s+load)\b|^\s*(cpu|procesor|proc|obciążenie|obc|load)\s*$", re.I),
             "monitor.cpu_status",
             {}
         ),
         # 2. Memory Monitor
         (
-            re.compile(r"\b(status\s+ram|pokaż\s+(pamięć|ram)|użycie\s+(ramu|ram|pamięci)|ram\s+status|show\s+memory|memory\s+usage)\b|^\s*(ram|pamięć|pamięci|memory)\s*$", re.I),
+            re.compile(r"\b(status\s+ram|pokaż\s+(pamięć|ram)|użycie\s+(ramu|ram|pamięci)|ram\s+status|show\s+memory|memory\s+usage)\b|^\s*(ram|pamięć|pam|pamięci|memory|mem)\s*$", re.I),
             "monitor.memory_status",
             {}
         ),
         # 3. Cache Cleanup
         (
-            re.compile(r"\b(wyczyść\s+cache|usuń\s+pamięć\s+podręczną|clear\s+cache|clean\s+cache|purge\s+cache)\b|^\s*(cache|wyczyść|purge|flush)\s*$", re.I),
+            re.compile(r"\b(wyczyść\s+cache|usuń\s+pamięć\s+podręczną|clear\s+cache|clean\s+cache|purge\s+cache)\b|^\s*(cache|wyczyść|wycz|czysz|purge|flush)\s*$", re.I),
             "cache.cleanup",
             {}
         ),
-        # 4. Service Restart (Exact single word or designated phrases; 'zrestartuj bazę' excluded to allow clarify)
+        # 4. Service Restart (Exact single word / half-word or designated phrases; 'zrestartuj bazę' excluded to allow clarify)
         (
-            re.compile(r"\b(zrestartuj\s+usługę|restart\s+service|zrestartuj\s+serwis)\b|^\s*(restart|zrestartuj|reboot|reset)\s*$", re.I),
+            re.compile(r"\b(zrestartuj\s+usługę|restart\s+service|zrestartuj\s+serwis)\b|^\s*(restart|res|zrestartuj|zre|reboot|reb|reset)\s*$", re.I),
             "service.restart",
             {"target": "default"}
         ),
         # 5. Task Schedule
         (
-            re.compile(r"\b(zaplanuj\s+zadanie|schedule\s+task|plan\s+task)\b|^\s*(harmonogram|zaplanuj|schedule|kolejkuj)\s*$", re.I),
+            re.compile(r"\b(zaplanuj\s+zadanie|schedule\s+task|plan\s+task)\b|^\s*(harmonogram|harm|zaplanuj|zap|schedule|sched|kolejkuj)\s*$", re.I),
             "task.schedule",
             {"title": "Routine health scan", "environment": "prod"}
         ),
         # 6. Task Get
         (
-            re.compile(r"\b(szczegóły\s+zadania|pokaż\s+szczegóły|task\s+details|show\s+details)\b|^\s*(szczegóły|szczegoly|inspect|dane)\s*$", re.I),
+            re.compile(r"\b(szczegóły\s+zadania|pokaż\s+szczegóły|task\s+details|show\s+details)\b|^\s*(szczegóły|szcz|szczegoly|inspect|insp|dane)\s*$", re.I),
             "task.get",
             {"id": "task-001"}
         ),
         # 7. Task Create
         (
-            re.compile(r"\b(utwórz\s+zadanie|dodaj\s+zadanie|nowe\s+zadanie|create\s+task|new\s+task)\b|^\s*(utwórz|utworz|nowy|create|dodaj)\s*$", re.I),
+            re.compile(r"\b(utwórz\s+zadanie|dodaj\s+zadanie|nowe\s+zadanie|create\s+task|new\s+task)\b|^\s*(utwórz|utw|utworz|nowy|create|crea|dodaj)\s*$", re.I),
             "task.create",
             {"title": "New Task"}
         ),
         # 8. Task Close
         (
-            re.compile(r"\b(zamknij\s+zadanie|zakończ\s+zadanie|close\s+task|complete\s+task)\b|^\s*(zakończ|zakoncz|zamknij|complete|gotowe)\s*$", re.I),
+            re.compile(r"\b(zamknij\s+zadanie|zakończ\s+zadanie|close\s+task|complete\s+task)\b|^\s*(zakończ|zak|zakoncz|zamknij|zam|complete|comp|gotowe)\s*$", re.I),
             "task.close",
             {"id": "task-001"}
         ),
         # 9. Task List
         (
-            re.compile(r"\b(pokaż\s+(otwarte\s+)?(zadania|tickety)|wypisz\s+(zadania|tickety)|list\s+(open\s+)?(tasks|tickets)|show\s+(tasks|tickets))\b|^\s*(zadania|tickety|tasks|tickets)\s*$", re.I),
+            re.compile(r"\b(pokaż\s+(otwarte\s+)?(zadania|tickety)|wypisz\s+(zadania|tickety)|list\s+(open\s+)?(tasks|tickets)|show\s+(tasks|tickets))\b|^\s*(zadania|zad|tickety|tick|tasks|tickets)\s*$", re.I),
             "task.list",
             {}
         ),
         # 10. Worktree Allocate
         (
-            re.compile(r"\b(alokuj\s+worktree|allocate\s+worktree|nowe\s+worktree|create\s+worktree)\b|^\s*(worktree|alokuj|gałąź|branch)\s*$", re.I),
+            re.compile(r"\b(alokuj\s+worktree|allocate\s+worktree|nowe\s+worktree|create\s+worktree)\b|^\s*(worktree|work|alokuj|alo|gałąź|branch)\s*$", re.I),
             "worktree.allocate",
             {"ticket": "ticket-current"}
         ),
         # 11. Koru Doctor
         (
-            re.compile(r"\b(koru\s+doctor|uruchom\s+doctora|sprawdź\s+błędy|doctor\s+diagnose)\b|^\s*(doctor|napraw|diagnostyka|diagnoza)\s*$", re.I),
+            re.compile(r"\b(koru\s+doctor|uruchom\s+doctora|sprawdź\s+błędy|doctor\s+diagnose)\b|^\s*(doctor|doc|napraw|nap|diagnostyka|diag|diagnoza)\s*$", re.I),
             "koru.doctor",
             {}
         ),
         # 12. Koru Queue Next
         (
-            re.compile(r"\b(następne\s+zadanie|kolejne\s+zadanie|next\s+task|pop\s+queue)\b|^\s*(kolejka|następne|następny|next)\s*$", re.I),
+            re.compile(r"\b(następne\s+zadanie|kolejne\s+zadanie|next\s+task|pop\s+queue)\b|^\s*(kolejka|kol|następne|nast|następny|next)\s*$", re.I),
             "koru.queue.next",
             {}
         ),
         # 13. Koru Queue Loop
         (
-            re.compile(r"\b(pętla\s+zadań|task\s+loop|run\s+loop|queue\s+loop)\b|^\s*(pętla|loop|automatyzacja|ciągłość)\s*$", re.I),
+            re.compile(r"\b(pętla\s+zadań|task\s+loop|run\s+loop|queue\s+loop)\b|^\s*(pętla|pęt|pet|loop|automatyzacja|auto|ciągłość)\s*$", re.I),
             "koru.queue.loop",
             {}
         ),
         # 14. Koru Context
         (
-            re.compile(r"\b(pokaż\s+kontekst|show\s+context|stan\s+projektu|session\s+context)\b|^\s*(kontekst|brief|context|stan)\s*$", re.I),
+            re.compile(r"\b(pokaż\s+kontekst|show\s+context|stan\s+projektu|session\s+context)\b|^\s*(kontekst|kon|brief|brie|context|stan)\s*$", re.I),
             "koru.context",
             {}
         ),
         # 15. Pull Request List
         (
-            re.compile(r"\b(pokaż\s+pr|list\s+prs|open\s+prs|lista\s+pr)\b|^\s*(pr|prs|pulls)\s*$", re.I),
+            re.compile(r"\b(pokaż\s+pr|list\s+prs|open\s+prs|lista\s+pr)\b|^\s*(pr|prs|pulls|pul)\s*$", re.I),
             "pr.list",
             {}
         ),
         # 16. Token List
         (
-            re.compile(r"\b(zużycie\s+tokenów|token\s+usage|stan\s+tokenów)\b|^\s*(token|tokeny|zużycie)\s*$", re.I),
+            re.compile(r"\b(zużycie\s+tokenów|token\s+usage|stan\s+tokenów)\b|^\s*(token|tok|tokeny|zużycie|zuż|zuz)\s*$", re.I),
             "token.list",
             {}
         ),
         # 17. Process List
         (
-            re.compile(r"\b(lista\s+procesów|list\s+processes|running\s+processes)\b|^\s*(procesy|agenty|processes)\s*$", re.I),
+            re.compile(r"\b(lista\s+procesów|list\s+processes|running\s+processes)\b|^\s*(procesy|proce|agenty|agen|processes)\s*$", re.I),
             "process.list",
             {}
         ),
@@ -421,7 +421,11 @@ class VoiceTokenStreamHandler:
             match_score = 0.0
             if clean and (clean in action_id.lower() or (target and clean in target.lower())):
                 match_score = 0.95 if is_deg else 0.85
-            elif any(clean.startswith(tok) for tok in ["zre", "rest", "pok", "stat", "czysz"]):
+            elif any(tok.startswith(clean) or clean.startswith(tok) for tok in [
+                "zre", "rest", "res", "pok", "stat", "czysz", "wycz", "proc", "cpu",
+                "pam", "ram", "mem", "kol", "doc", "nap", "zad", "harm", "work",
+                "pet", "kon", "tok", "alo"
+            ]):
                 match_score = 0.90 if is_deg else 0.75
 
             if match_score > 0:
