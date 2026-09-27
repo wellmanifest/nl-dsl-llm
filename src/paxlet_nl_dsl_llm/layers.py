@@ -212,6 +212,23 @@ class FastPathParser:
         "zużycie": ("token.list", {}),
         "procesy": ("process.list", {}),
         "agenty": ("process.list", {}),
+        # Canonical prefixes for half-words with typos
+        "res": ("service.restart", {"target": "default"}),
+        "zre": ("service.restart", {"target": "default"}),
+        "proc": ("monitor.cpu_status", {}),
+        "pam": ("monitor.memory_status", {}),
+        "wycz": ("cache.cleanup", {}),
+        "czysz": ("cache.cleanup", {}),
+        "zad": ("task.list", {}),
+        "harm": ("task.schedule", {"title": "Routine health scan"}),
+        "work": ("worktree.allocate", {"ticket": "ticket-current"}),
+        "doc": ("koru.doctor", {}),
+        "kol": ("koru.queue.next", {}),
+        "pet": ("koru.queue.loop", {}),
+        "kon": ("koru.context", {}),
+        "tok": ("token.list", {}),
+        "alo": ("worktree.allocate", {"ticket": "ticket-current"}),
+        "proce": ("process.list", {}),
     }
 
     def parse(self, text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
@@ -234,10 +251,10 @@ class FastPathParser:
 
                 return action_id, args
 
-        # Layer 0.8: Fuzzy acoustic and keyboard typo fallback for single words
+        # Layer 0.8: Fuzzy acoustic and keyboard typo fallback for single words and prefixes
         tokens = clean.split()
         if len(tokens) == 1 and len(clean) >= 3:
-            q_raw = tokens[0].lower()
+            q_raw = tokens[0].lower().strip(".,;:?!")
             q_phonetic = phonetic_key(q_raw)
             best_match = None
             min_dist = 3
@@ -265,6 +282,25 @@ class FastPathParser:
                 args = dict(def_args)
                 args["_typo_corrected_from"] = q_raw
                 return act_id, args
+
+        # Check multi-word phrases where the primary verb has an acoustic typo (e.g. 'Zwestartuj proces...')
+        if len(tokens) > 1 and len(clean) <= 60:
+            first_raw = tokens[0].lower().strip(".,;:?!")
+            first_phon = phonetic_key(first_raw)
+            for kw, (act_id, def_args) in self.TYPO_CATALOG.items():
+                if len(kw) >= 5:
+                    d_raw = damerau_levenshtein(first_raw, kw.lower())
+                    d_phon = damerau_levenshtein(first_phon, phonetic_key(kw.lower()))
+                    best_d = min(d_raw, d_phon)
+                    if 0 < best_d <= 2:
+                        args = dict(def_args)
+                        args["_typo_corrected_from"] = first_raw
+                        if "redis" in clean.lower():
+                            args["target"] = "redis"
+                            return act_id, args
+                        elif "postgres" in clean.lower():
+                            args["target"] = "postgres"
+                            return act_id, args
 
         return None
 
