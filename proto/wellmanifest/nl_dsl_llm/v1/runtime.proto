@@ -1,0 +1,189 @@
+syntax = "proto3";
+
+package wellmanifest.nl_dsl_llm.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/wellmanifest/nl-dsl-llm/proto/v1;nl_dsl_llm_v1";
+option java_multiple_files = true;
+option java_package = "org.wellmanifest.nl_dsl_llm.v1";
+
+// Wellmanifest Standard: NL-DSL-LLM Runtime Service
+service NLRuntimeService {
+  // Interpret natural language query into validated canonical DSL action
+  rpc InterpretIntent(InterpretIntentRequest) returns (InterpretIntentResponse);
+
+  // Directly execute a validated canonical DSL action
+  rpc ExecuteAction(ExecuteActionRequest) returns (ExecuteActionResponse);
+
+  // Compare intent interpretation across models
+  rpc BenchmarkIntent(BenchmarkIntentRequest) returns (BenchmarkIntentResponse);
+
+  // Suggest real-time autocomplete options and option network branches based on partial input and digital twin state
+  rpc SuggestOptions(SuggestOptionsRequest) returns (SuggestOptionsResponse);
+
+  // Retrieve registered actions and procedures
+  rpc GetActionCatalog(GetActionCatalogRequest) returns (GetActionCatalogResponse);
+}
+
+enum IntentStatus {
+  INTENT_STATUS_UNSPECIFIED = 0;
+  INTENT_STATUS_MATCHED = 1;     // Action and arguments definitively matched
+  INTENT_STATUS_CLARIFY = 2;     // Ambiguous intent, requires user clarification
+  INTENT_STATUS_UNSUPPORTED = 3; // Intent falls outside system catalog
+  INTENT_STATUS_FAILED = 4;      // Parsing or schema validation error
+}
+
+enum SourceLayer {
+  SOURCE_LAYER_UNSPECIFIED = 0;
+  SOURCE_LAYER_FAST_PATH_REGEX = 1; // Layer 1: Rule-based regex/synonyms (<1ms, 0 tok)
+  SOURCE_LAYER_SEMANTIC_CACHE = 2;  // Layer 1.5: Embedding cache (<20ms)
+  SOURCE_LAYER_LLM_FALLBACK = 3;    // Layer 3: Constrained LLM translation
+}
+
+message ClientContext {
+  string client_id = 1;             // e.g. "taskand", "clonerd", "nl-dsl-sh"
+  string session_id = 2;            // Active user session ID
+  string current_view = 3;          // Current UI view/step
+  string target_environment = 4;    // e.g. "prod", "test", "dev"
+  string user_locale = 5;           // e.g. "pl-PL", "en-US"
+  google.protobuf.Struct metadata = 6;
+}
+
+message InterpretIntentRequest {
+  string query = 1;                 // Raw natural language query
+  ClientContext context = 2;        // Client context and environment
+  bool allow_llm_fallback = 3;      // Permit Layer 3 fallback (default true)
+  repeated string candidate_actions = 4; // Optional restriction of candidate actions
+}
+
+message ClarificationOption {
+  string action_id = 1;
+  string label = 2;                 // Human-readable option label
+  string description = 3;
+  google.protobuf.Struct default_arguments = 4;
+}
+
+message InterpretIntentResponse {
+  IntentStatus status = 1;
+  string action_id = 2;             // e.g. "monitor.cpu_status", "service.restart"
+  google.protobuf.Struct arguments = 3; // Extracted arguments
+  string resolved_procedure_uri = 4; // Expanded URI, e.g. "proc://taskand.dev/monitor/cpu/v1"
+  SourceLayer matched_layer = 5;
+  double confidence = 6;            // Confidence score 0.0 to 1.0
+  string clarification_prompt = 7;  // Clarification question if status == CLARIFY
+  repeated ClarificationOption clarification_options = 8;
+  ExecutionMeta meta = 9;
+}
+
+message ExecuteActionRequest {
+  string action_id = 1;
+  google.protobuf.Struct arguments = 2;
+  string idempotency_key = 3;
+  bool dry_run = 4;
+  ClientContext context = 5;
+}
+
+message ExecuteActionResponse {
+  bool success = 1;
+  string status_code = 2;           // "OK", "VALIDATION_FAILED", "EXECUTION_ERROR"
+  google.protobuf.Struct data = 3;
+  repeated string errors = 4;
+  ExecutionMeta meta = 5;
+}
+
+message ExecutionMeta {
+  double total_latency_ms = 1;
+  double prefill_latency_ms = 2;
+  double generation_latency_ms = 3;
+  uint32 prompt_tokens = 4;
+  uint32 completion_tokens = 5;
+  string trace_id = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+message BenchmarkResult {
+  string model_name = 1;
+  IntentStatus status = 2;
+  string action_id = 3;
+  google.protobuf.Struct arguments = 4;
+  double total_latency_ms = 5;
+  double prefill_latency_ms = 6;
+  double gen_tokens_per_sec = 7;
+  uint32 completion_tokens = 8;
+  uint64 memory_rss_bytes = 9;
+  bool schema_strictly_valid = 10;
+  bool exact_match = 11;
+}
+
+message BenchmarkIntentRequest {
+  string query = 1;
+  ClientContext context = 2;
+  string expected_action_id = 3;
+  google.protobuf.Struct expected_arguments = 4;
+}
+
+message BenchmarkIntentResponse {
+  string query = 1;
+  repeated BenchmarkResult model_results = 2;
+  string winner = 3;
+  string notes = 4;
+}
+
+message GetActionCatalogRequest {
+  string client_id = 1;
+}
+
+message ActionDefinition {
+  string action_id = 1;
+  string title = 2;
+  string description = 3;
+  repeated string aliases_pl = 4;
+  repeated string aliases_en = 5;
+  google.protobuf.Struct parameters_schema = 6;
+  string target_uri_pattern = 7;
+}
+
+message GetActionCatalogResponse {
+  repeated ActionDefinition actions = 1;
+  string catalog_version = 2;
+}
+
+message DigitalTwinContext {
+  string environment = 1;               // "prod", "stage", "dev", "local"
+  repeated string active_services = 2;  // ["postgres", "redis", "gateway"]
+  repeated string degraded_services = 3;// ["redis"]
+  repeated string active_tickets = 4;   // ["ticket-001", "ticket-002"]
+  repeated string cluster_nodes = 5;    // ["node-1", "node-2"]
+  google.protobuf.Struct custom_state = 6;
+}
+
+message SuggestOptionsRequest {
+  string partial_query = 1;             // e.g. "zre", "pokaz b", "ticket"
+  string client_id = 2;                 // "taskand", "clonerd", "nl-dsl-sh"
+  string locale = 3;                    // "pl", "en", "de", "uk"
+  int32 max_suggestions = 4;            // Default 5
+  DigitalTwinContext twin_context = 5;
+}
+
+message OptionNode {
+  string id = 1;                        // Unique option identifier
+  string display_label = 2;             // "Zrestartuj redis-cache (Zdegradowany)"
+  string completion_text = 3;           // "zrestartuj redis-cache"
+  string action_id = 4;                 // "service.restart"
+  string resolved_uri = 5;              // "proc://taskand.dev/service/restart/v1"
+  google.protobuf.Struct bound_arguments = 6; // {"target": "redis-cache", "env": "prod"}
+  double confidence = 7;                // 0.0 - 1.0
+  bool requires_confirmation = 8;       // true if env=prod or destructive
+  string badge = 9;                     // "RECOMMENDED", "PROD", "DEGRADED"
+  repeated OptionNode next_options = 10;// Sub-options / parameters (Option Network DAG)
+}
+
+message SuggestOptionsResponse {
+  bool success = 1;
+  string partial_query = 2;
+  repeated OptionNode suggestions = 3;
+  double latency_ms = 4;
+}
+

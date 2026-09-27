@@ -24,7 +24,8 @@ jobs:
           pip install pydantic pytest
       - name: Governance check
         run: |
-          ./project/governance-check.sh
+          ./scripts/install-agent-hosts.sh
+          ./project/governance-check.sh --actor ci
       - name: Run test suite
         run: |
-          pytest
+          python3 -B -m pytest -o pythonpath=. -p no:cacheprovider
