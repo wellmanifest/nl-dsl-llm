@@ -5,7 +5,6 @@ import asyncio
 import base64
 import json
 import time
-import pytest
 
 from standard.nl_dsl_llm_ws import (
     NLStreamFrame,
@@ -101,106 +100,108 @@ def test_streaming_option_network_dag_structure():
         assert any(e["to"] == param_nodes[0]["id"] for e in edges)
 
 
-@pytest.mark.asyncio
-async def test_websocket_streaming_server_session_lifecycle():
+def test_websocket_streaming_server_session_lifecycle():
     """End-to-end integration test of NLStreamServer with simulated client."""
-    server = NLStreamServer(host="127.0.0.1", port=0)
-    await server.start()
-    assert server.server is not None
-    port = server.server.sockets[0].getsockname()[1]
+    async def _run_test():
+        server = NLStreamServer(host="127.0.0.1", port=0)
+        await server.start()
+        assert server.server is not None
+        port = server.server.sockets[0].getsockname()[1]
 
-    try:
-        reader, writer = await asyncio.open_connection("127.0.0.1", port)
+        try:
+            reader, writer = await asyncio.open_connection("127.0.0.1", port)
 
-        # 1. Perform WebSocket Handshake
-        client_key = base64.b64encode(b"0123456789abcdef").decode("ascii")
-        handshake_req = (
-            f"GET /ws/stream HTTP/1.1\r\n"
-            f"Host: 127.0.0.1:{port}\r\n"
-            f"Upgrade: websocket\r\n"
-            f"Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Key: {client_key}\r\n"
-            f"Sec-WebSocket-Version: 13\r\n"
-            f"\r\n"
-        )
-        writer.write(handshake_req.encode("ascii"))
-        await writer.drain()
+            # 1. Perform WebSocket Handshake
+            client_key = base64.b64encode(b"0123456789abcdef").decode("ascii")
+            handshake_req = (
+                f"GET /ws/stream HTTP/1.1\r\n"
+                f"Host: 127.0.0.1:{port}\r\n"
+                f"Upgrade: websocket\r\n"
+                f"Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Key: {client_key}\r\n"
+                f"Sec-WebSocket-Version: 13\r\n"
+                f"\r\n"
+            )
+            writer.write(handshake_req.encode("ascii"))
+            await writer.drain()
 
-        # Read Handshake Response
-        handshake_resp = await reader.readuntil(b"\r\n\r\n")
-        assert b"101 Switching Protocols" in handshake_resp
+            # Read Handshake Response
+            handshake_resp = await reader.readuntil(b"\r\n\r\n")
+            assert b"101 Switching Protocols" in handshake_resp
 
-        # Helper to send masked text frame
-        def send_text_frame(text: str):
-            writer.write(encode_ws_frame(text, opcode=1, mask=True))
+            # Helper to send masked text frame
+            def send_text_frame(text: str):
+                writer.write(encode_ws_frame(text, opcode=1, mask=True))
 
-        rx_buf = bytearray()
-        # Helper to read next unmasked frame
-        async def read_frame() -> tuple[int, str]:
-            while True:
-                res = decode_ws_frame(rx_buf)
-                if res is not None:
-                    opcode, payload, consumed = res
-                    del rx_buf[:consumed]
-                    return opcode, payload.decode("utf-8")
-                chunk = await reader.read(1024)
-                assert len(chunk) > 0, "Connection closed unexpectedly"
-                rx_buf.extend(chunk)
+            rx_buf = bytearray()
+            # Helper to read next unmasked frame
+            async def read_frame() -> tuple[int, str]:
+                while True:
+                    res = decode_ws_frame(rx_buf)
+                    if res is not None:
+                        opcode, payload, consumed = res
+                        del rx_buf[:consumed]
+                        return opcode, payload.decode("utf-8")
+                    chunk = await reader.read(1024)
+                    assert len(chunk) > 0, "Connection closed unexpectedly"
+                    rx_buf.extend(chunk)
 
-        # 2. Send STREAM_START
-        start_frame = NLStreamFrame(
-            type=StreamFrameType.STREAM_START,
-            session_id="client_session_1",
-            sequence=1,
-            timestamp_ms=time.time() * 1000,
-            payload={"client": "test-runner", "audio_codec": "pcm16"},
-        )
-        send_text_frame(start_frame.to_json())
-        await writer.drain()
+            # 2. Send STREAM_START
+            start_frame = NLStreamFrame(
+                type=StreamFrameType.STREAM_START,
+                session_id="client_session_1",
+                sequence=1,
+                timestamp_ms=time.time() * 1000,
+                payload={"client": "test-runner", "audio_codec": "pcm16"},
+            )
+            send_text_frame(start_frame.to_json())
+            await writer.drain()
 
-        opcode, resp_raw = await read_frame()
-        resp_start = NLStreamFrame.from_json(resp_raw)
-        assert resp_start.type == StreamFrameType.STREAM_START
-        assert resp_start.payload["status"] == "ready"
+            opcode, resp_raw = await read_frame()
+            resp_start = NLStreamFrame.from_json(resp_raw)
+            assert resp_start.type == StreamFrameType.STREAM_START
+            assert resp_start.payload["status"] == "ready"
 
-        # 3. Send TRANSCRIPTION_PARTIAL (live typing simulation)
-        partial_frame = NLStreamFrame(
-            type=StreamFrameType.TRANSCRIPTION_PARTIAL,
-            session_id="client_session_1",
-            sequence=2,
-            timestamp_ms=time.time() * 1000,
-            payload={"text": "zatrz"},
-        )
-        send_text_frame(partial_frame.to_json())
-        await writer.drain()
+            # 3. Send TRANSCRIPTION_PARTIAL (live typing simulation)
+            partial_frame = NLStreamFrame(
+                type=StreamFrameType.TRANSCRIPTION_PARTIAL,
+                session_id="client_session_1",
+                sequence=2,
+                timestamp_ms=time.time() * 1000,
+                payload={"text": "zatrz"},
+            )
+            send_text_frame(partial_frame.to_json())
+            await writer.drain()
 
-        opcode, resp_raw = await read_frame()
-        resp_opt = NLStreamFrame.from_json(resp_raw)
-        assert resp_opt.type == StreamFrameType.OPTION_NETWORK_UPDATE
-        assert resp_opt.payload["prefix"] == "zatrz"
-        assert len(resp_opt.payload["candidates"]) > 0
-        assert resp_opt.payload["sla_met"] is True
+            opcode, resp_raw = await read_frame()
+            resp_opt = NLStreamFrame.from_json(resp_raw)
+            assert resp_opt.type == StreamFrameType.OPTION_NETWORK_UPDATE
+            assert resp_opt.payload["prefix"] == "zatrz"
+            assert len(resp_opt.payload["candidates"]) > 0
+            assert resp_opt.payload["sla_met"] is True
 
-        # 4. Send COMMAND_COMMITTED
-        commit_frame = NLStreamFrame(
-            type=StreamFrameType.COMMAND_COMMITTED,
-            session_id="client_session_1",
-            sequence=3,
-            timestamp_ms=time.time() * 1000,
-            payload={"text": "zamknij zadanie ticket-001"},
-        )
-        send_text_frame(commit_frame.to_json())
-        await writer.drain()
+            # 4. Send COMMAND_COMMITTED
+            commit_frame = NLStreamFrame(
+                type=StreamFrameType.COMMAND_COMMITTED,
+                session_id="client_session_1",
+                sequence=3,
+                timestamp_ms=time.time() * 1000,
+                payload={"text": "zamknij zadanie ticket-001"},
+            )
+            send_text_frame(commit_frame.to_json())
+            await writer.drain()
 
-        opcode, resp_raw = await read_frame()
-        resp_cmd = NLStreamFrame.from_json(resp_raw)
-        assert resp_cmd.type == StreamFrameType.COMMAND_RESULT
-        assert resp_cmd.payload["success"] is True
-        assert resp_cmd.payload["status"] == "OK"
-        assert "execution_ms" in resp_cmd.payload
+            opcode, resp_raw = await read_frame()
+            resp_cmd = NLStreamFrame.from_json(resp_raw)
+            assert resp_cmd.type == StreamFrameType.COMMAND_RESULT
+            assert resp_cmd.payload["success"] is True
+            assert resp_cmd.payload["status"] == "OK"
+            assert "execution_ms" in resp_cmd.payload
 
-        # Close client
-        writer.close()
-        await writer.wait_closed()
-    finally:
-        await server.stop()
+            # Close client
+            writer.close()
+            await writer.wait_closed()
+        finally:
+            await server.stop()
+
+    asyncio.run(_run_test())
