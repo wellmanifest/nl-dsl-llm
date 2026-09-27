@@ -431,6 +431,17 @@ class OptionNetworkEngine:
             ]
         },
         {
+            "verb_patterns": ["zatrzymaj", "stop", "wyłącz", "halt"],
+            "action_id": "service.stop",
+            "uri_pattern": "proc://taskand.dev/service/stop/v1",
+            "entity_type": "service",
+            "destructive": True,
+            "next_suboptions": [
+                {"flag": "--graceful", "label": "Łagodne zatrzymanie"},
+                {"flag": "--force", "label": "Wymuszone natychmiastowe zatrzymanie"}
+            ]
+        },
+        {
             "verb_patterns": ["status", "stan", "pokaż stan", "sprawdź stan", "check"],
             "action_id": "service.status",
             "uri_pattern": "proc://taskand.dev/service/status/v1",
