@@ -130,6 +130,25 @@ Every adopting system provides four synchronous interface surfaces sharing the i
 - Standardized binary RPC over Unix Domain Sockets (`/run/...`) and TCP (`InterpretIntent`, `SuggestOptions`).
 - Provides sub-millisecond local IPC (<0.5ms) for containerized and daemon services.
 
+### 3.5 Bidirectional WebSocket Streaming Protocol (`/ws/stream`)
+- Real-time bidirectional streaming transport for voice audio chunks (PCM 16kHz, Opus) and interactive UI inputs.
+- Streaming frame envelopes (`NLStreamFrame`) supporting:
+  - `STREAM_START`: Client handshake specifying schema dialect, session ID, audio format, and feature flags (`option_network_stream: true`).
+  - `AUDIO_CHUNK`: Chunked binary/base64 audio frames (20ms-100ms) for streaming STT processing.
+  - `TRANSCRIPTION_PARTIAL`: Continuous interim transcription updates with stability scores (`0.0`-`1.0`).
+  - `OPTION_NETWORK_UPDATE`: Real-time candidate graph updates pushed to the client with sub-50ms latency as prefix tokens evolve.
+  - `COMMAND_COMMITTED`: User utterance or chip selection confirmed; triggers deterministic 4-tier pipeline execution.
+  - `COMMAND_RESULT`: Execution completion payload containing canonical DSL, status, latency telemetry, and UI feedback.
+  - `STREAM_ERROR`: Structured diagnostic errors with failure category and recovery action.
+
+### 3.6 Option Network Live Autocomplete Engine
+- Fast Trie and DAG path-finding engine executing within <5ms in-memory.
+- Given streaming prefix $P$, computes the active Option Network $\mathcal{G} = (V, E)$:
+  - Vertices $V$: Candidate command tokens, parameters, and entities.
+  - Edges $E$: Valid semantic transitions governed by the domain grammar.
+- Prunes branches violating current Digital Twin state or permission boundaries.
+- Emits ranked suggestions with confidence weights, badges, and parameter defaults.
+
 ---
 
 ## 4. Conformance Criteria & Checkpoints
@@ -137,7 +156,8 @@ Every adopting system provides four synchronous interface surfaces sharing the i
 1. **[CONF-01] Multilingual Fast Path**: Implements deterministic Layer 1 regex/synonym parsing for Polish and English.
 2. **[CONF-02] Canonical DSL Enforcement**: All mutations and queries route exclusively through validated Layer 2 DSL commands.
 3. **[CONF-03] Sandboxed LLM Fallback**: LLM integration is restricted to translating unrecognized NL prompts into canonical DSL with schema constraints.
-4. **[CONF-04] Four-Interface Parity**: CLI (`ask`/`dsl`/`suggest`), REST API, MCP Server (`nl_ask`), and gRPC (`InterpretIntent`, `SuggestOptions`) are supported.
+4. **[CONF-04] Unified Interface Parity**: CLI (`ask`/`dsl`/`suggest`), REST API, MCP Server (`nl_ask`), gRPC (`InterpretIntent`, `SuggestOptions`), and WebSocket streaming are supported.
 5. **[CONF-05] Semantic Intent Cache Integrity**: Explicit polarity check and slot verification prevent negation inversion errors.
 6. **[CONF-06] Contextual Option Network**: Prefix suggestions dynamically prune non-existent entities and project Digital Twin resource graphs within <5ms.
 7. **[CONF-07] Deterministic Conformance Verification**: Self-testing test suite executable via CLI.
+8. **[CONF-08] WebSocket Bidirectional Streaming Parity**: Streaming chunked audio/tokens with sub-50ms live Option Network autocomplete and structured frame events.

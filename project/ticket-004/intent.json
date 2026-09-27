@@ -1,0 +1,105 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-004",
+  "summary": "WebSocket streaming protocol and live Option Network autocomplete",
+  "workstream": "integration",
+  "classification": {
+    "kind": "SERVICE",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "spec/**",
+    "proto/**",
+    "standard/**",
+    "examples/**",
+    "project/ticket-004/**",
+    "project/TICKETS.md",
+    "TODO.md"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "3424baf06735af4dbe6abbb99696bb50b4c31136",
+    "targetBranch": "main",
+    "outcome": "Formalize WebSocket bidirectional streaming protocol and live Option Network DAG autocomplete, implement reference streaming server, conformance tests, and example client.",
+    "nonGoals": [
+      "No direct push or merge to main without approval.",
+      "No remote API keys hardcoded."
+    ],
+    "complexity": "M",
+    "estimatedMinutes": 60,
+    "budgets": {
+      "maxImplementationFiles": 5,
+      "maxAffectedComponents": 3,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Add Section 3.5 & 3.6 to spec/NL_DSL_LLM_SPECIFICATION.md detailing WebSocket frame protocol and live Option Network autocomplete; implement standard/nl_dsl_llm_ws.py reference streaming server with zero external dependencies (standard library asyncio/websockets or lightweight async protocol); add standard/test_websocket_streaming.py; provide examples/websocket_streaming_client.py.",
+      "components": [
+        {
+          "name": "specification",
+          "paths": [
+            "spec/NL_DSL_LLM_SPECIFICATION.md"
+          ]
+        },
+        {
+          "name": "standard-streaming",
+          "paths": [
+            "standard/nl_dsl_llm.py",
+            "standard/nl_dsl_llm_ws.py",
+            "standard/test_websocket_streaming.py"
+          ]
+        },
+        {
+          "name": "examples",
+          "paths": [
+            "examples/websocket_streaming_client.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [
+        "Adds 5th interface parity surface: WebSocket bidirectional streaming protocol for chunked audio and live Option Network DAG autocomplete."
+      ],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the commit on ticket branch."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider standard/test_websocket_streaming.py"
+        ],
+        "evidence": "WebSocket streaming conformance tests pass."
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "python3 -B examples/websocket_streaming_client.py --benchmark"
+        ],
+        "evidence": "Streaming latency benchmark demonstrates sub-50ms DAG projection updates."
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "Governance check passes with 0 errors and 0 warnings."
+      }
+    ]
+  }
+}
