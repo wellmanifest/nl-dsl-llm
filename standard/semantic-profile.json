@@ -1,0 +1,20 @@
+{
+  "profile": "semantic-v1",
+  "envelope": "wellmanifest.nl-plan/v1",
+  "schema": "schemas/nl-plan.schema.json",
+  "unicode": "preserve",
+  "retrieval": "multilingual-semantic",
+  "generation": "operation-specialized-json-schema",
+  "statuses": [
+    "ok",
+    "clarify",
+    "unsupported"
+  ],
+  "plans": [
+    "call",
+    "sequence"
+  ],
+  "max_steps": 16,
+  "compilation_executes": false,
+  "runtime_owner": "paxlet-com/dockuri"
+}

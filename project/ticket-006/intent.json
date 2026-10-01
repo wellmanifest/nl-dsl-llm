@@ -1,0 +1,89 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-006",
+  "summary": "Semantic multilingual NL to validated operation plan",
+  "workstream": "integration",
+  "classification": {
+    "kind": "FEATURE",
+    "priority": "P2",
+    "origin": "requested"
+  },
+  "allowedPaths": [
+    "project/ticket-006/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "schemas/nl-plan.schema.json",
+    "spec/SEMANTIC_NL_PLAN.md",
+    "standard/semantic-profile.json",
+    "standard/test_semantic_profile.py"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "e15d45d18c8d67327f15a0bd8e065879a8ba6e64",
+    "targetBranch": "main",
+    "outcome": "Publish the optional semantic-v1 multilingual contract retrieval and validated NL plan profile, with conformance tests.",
+    "nonGoals": [
+      "No model performance guarantee or mandatory vendor.",
+      "No mutation of other active tickets or execution authority derived from model output."
+    ],
+    "complexity": "M",
+    "estimatedMinutes": 90,
+    "budgets": {
+      "maxImplementationFiles": 4,
+      "maxAffectedComponents": 3,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Define one catalog-specialized typed call/sequence IR and adopt the shared Dockuri compiler through an injected planner; keep legacy matching only as an explicitly separate compatibility profile.",
+      "components": [
+        {
+          "name": "semantic-profile",
+          "paths": [
+            "spec/SEMANTIC_NL_PLAN.md",
+            "schemas/nl-plan.schema.json",
+            "standard/semantic-profile.json",
+            "standard/test_semantic_profile.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [
+        "Adds optional semantic-v1 profile."
+      ],
+      "dataChanges": [
+        "Adds wellmanifest.nl-plan/v1 envelope."
+      ],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert only this ticket commit."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider standard/test_semantic_profile.py"
+        ],
+        "evidence": "Profile and adapter conformance pass."
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "Managed scope and governance pass."
+      }
+    ]
+  }
+}
