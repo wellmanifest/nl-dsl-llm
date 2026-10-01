@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wellmanifest.org/nl-plan/v1",
+  "type": "object",
+  "$defs": {
+    "call": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "call"
+        },
+        "operation": {
+          "type": "string",
+          "pattern": "^[^\\s]+://[^\\s]+$"
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "kind",
+        "operation",
+        "arguments",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "sequence": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "sequence"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/call"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "steps"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "wellmanifest.nl-plan/v1"
+        },
+        "status": {
+          "const": "ok"
+        },
+        "plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/call"
+            },
+            {
+              "$ref": "#/$defs/sequence"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "plan"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "wellmanifest.nl-plan/v1"
+        },
+        "status": {
+          "const": "clarify"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "question"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "wellmanifest.nl-plan/v1"
+        },
+        "status": {
+          "const": "unsupported"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}
