@@ -1,0 +1,82 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-007",
+  "summary": "Conversational stream purity and state URL sync conformance",
+  "workstream": "integration",
+  "classification": {
+    "kind": "FEATURE",
+    "priority": "P2",
+    "origin": "requested"
+  },
+  "allowedPaths": [
+    "project/ticket-007/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "spec/NL_DSL_LLM_SPECIFICATION.md"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "94dbcae5fb40e1aa029af3b7f6c7c4d00029b34a",
+    "targetBranch": "main",
+    "outcome": "Extend NL-DSL-LLM specification with conversational stream purity, dedicated process views, and bidirectional URL state synchronization (CONF-09, CONF-10).",
+    "nonGoals": [
+      "Alter gRPC protocol or core Trie engine",
+      "Break existing CONF-01..08 requirements"
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 30,
+    "budgets": {
+      "maxImplementationFiles": 3,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Add sections 3.7 and 3.8 to spec/NL_DSL_LLM_SPECIFICATION.md and checkpoints CONF-09, CONF-10 binding to wellmanifest/nl-uri-dsl-llm NUL-007 and NUL-008.",
+      "components": [
+        {
+          "name": "specification",
+          "paths": [
+            "spec/NL_DSL_LLM_SPECIFICATION.md"
+          ]
+        },
+        {
+          "name": "governance",
+          "paths": [
+            "project/ticket-007/**",
+            "project/TICKETS.md",
+            "TODO.md"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [
+        "Adds CONF-09 and CONF-10 conformance criteria"
+      ],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert ticket-007 commit."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "Managed scope and governance check pass."
+      }
+    ]
+  }
+}
