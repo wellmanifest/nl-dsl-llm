@@ -149,6 +149,18 @@ Every adopting system provides four synchronous interface surfaces sharing the i
 - Prunes branches violating current Digital Twin state or permission boundaries.
 - Emits ranked suggestions with confidence weights, badges, and parameter defaults.
 
+### 3.7 Conversational Stream Purity & Dedicated Process View (NUL-007 Binding)
+In interactive chat, conversational agent palettes, or conversational CLI shells:
+- **Strict Conversational Purity**: The chat stream is reserved for dialogue, user utterances, and structured execution notifications.
+- **Process Isolation**: Raw subprocess stdout/stderr, multiline dumps, and ANSI terminal sequences must not pollute the conversational transcript.
+- **Canonical Addressing**: Executions are referenced by RFC 3986 Action URI (`process://<host>/<bin>?<params>`) and Resource URN (`urn:<domain>:proc:<id>`).
+- **Dedicated Artifact View**: Execution output, buffers, exit codes, and interactive CLI inputs are displayed in a separate, isolated Process/Terminal Artifact View (`.pal-term`).
+
+### 3.8 Bidirectional Interactive State URL Synchronization (NUL-008 Binding)
+Every web-based or dashboard interface adopting the NL-DSL-LLM pattern must maintain full state synchronization with RFC 3986 query parameters via debounced `history.replaceState`:
+- **Real-Time Serialization**: Active layout, pane configurations, focus, open modal/chat, active artifact tab, search/command query, and last interaction event are reflected in URL query parameters.
+- **Deterministic Reconstruction**: Loading or deep-linking to an URL with query parameters faithfully restores the exact workspace, panes, focus, and input state without loss.
+
 ---
 
 ## 4. Conformance Criteria & Checkpoints
@@ -161,3 +173,5 @@ Every adopting system provides four synchronous interface surfaces sharing the i
 6. **[CONF-06] Contextual Option Network**: Prefix suggestions dynamically prune non-existent entities and project Digital Twin resource graphs within <5ms.
 7. **[CONF-07] Deterministic Conformance Verification**: Self-testing test suite executable via CLI.
 8. **[CONF-08] WebSocket Bidirectional Streaming Parity**: Streaming chunked audio/tokens with sub-50ms live Option Network autocomplete and structured frame events.
+9. **[CONF-09] Conversational Stream Purity**: Chat log nodes exclude raw process stdout/stderr streams, emitting only dialogue and canonical URI/URN receipts.
+10. **[CONF-10] Deterministic Bidirectional State URL Sync**: Deep linking and reloading URL with query parameters restores exact UI layout, focus, dialog, and active tab.
