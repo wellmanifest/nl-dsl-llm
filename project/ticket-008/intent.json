@@ -1,0 +1,83 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-008",
+  "summary": "standardize pytest pythonpath and packaging configuration",
+  "workstream": "integration",
+  "classification": {
+    "kind": "SERVICE",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "project/ticket-008/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "pyproject.toml",
+    "standard/**"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "a4ed2ac78d3604d3c2698f15aae67a549d085f63",
+    "targetBranch": "main",
+    "outcome": "Standardize pytest testpaths and pythonpath configuration and package __init__.py markers for seamless standalone test execution.",
+    "nonGoals": [
+      "Alter core Trie algorithms or tripartite protocol models",
+      "Introduce new runtime dependencies"
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 15,
+    "budgets": {
+      "maxImplementationFiles": 3,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 0,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Configure testpaths and pythonpath under [tool.pytest.ini_options] in pyproject.toml and add standard/__init__.py package marker.",
+      "components": [
+        {
+          "name": "packaging",
+          "paths": [
+            "pyproject.toml",
+            "standard/__init__.py"
+          ]
+        },
+        {
+          "name": "governance",
+          "paths": [
+            "project/ticket-008/**",
+            "project/TICKETS.md",
+            "TODO.md"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert ticket-008 commit."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "pytest",
+          "./project/governance-check.sh"
+        ],
+        "evidence": "Pytest passes directly and governance check passes with 0 errors, 0 warnings."
+      }
+    ]
+  }
+}
