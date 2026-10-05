@@ -32,9 +32,13 @@ inference = [
 standard = "0.20.32"
 revision = "b6ba9c21a65a6a5648ecf904b64c3b75295e136f"
 gate = "project/governance-check.sh"
+adopts = [
+    "wellmanifest/nl-dsl-llm@0.1.0",
+]
 
 [tool.pytest.ini_options]
 addopts = "-p wellmanifest_governance"
 testpaths = ["standard", "tests"]
 python_files = ["test_*.py"]
 pythonpath = [".", "src"]
+cache_dir = ".subactor/cache/pytest"

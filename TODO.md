@@ -8,5 +8,6 @@
 - [x] Ticket-002: Add clients for Taskand, Clonerd, and nl-dsl-sh (paxlet runtime line)
 - [x] Ticket-003: Docker and systemd deployment for shared nl-runtime daemon
 - [x] Ticket-004: WebSocket streaming protocol and live Option Network autocomplete
+- [x] Ticket-004: Standardize standard adoption and pytest configuration (paxlet runtime line)
 - [x] Ticket-007: Conversational stream purity and state URL sync conformance (CONF-09, CONF-10)
 - [x] Ticket-008: Standardize pytest pythonpath and packaging configuration
