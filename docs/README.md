@@ -1,7 +1,23 @@
+---
+schema: wellmanifest.docs/document/v2
+title: NL-DSL-LLM Documentation Index
+description: Technical documentation for nl-dsl-llm runtime service and resolution engine.
+category: index
+tags:
+  - documentation
+  - index
+  - nlp
+  - dsl
+---
+
 # Documentation Index
 
 Welcome to the technical documentation for `paxlet-com/nl-dsl-llm`.
 Follows the `wellmanifest/docs` v2 Compact Profile standard (DOCS-009).
+
+## Architecture & Overview
+
+- [Architecture & Operational Overview](INFORMATION/OVERVIEW.md) — multi-layered resolution engine, fast-path, and IPC transport.
 
 ## Documents
 
