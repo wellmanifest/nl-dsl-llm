@@ -634,10 +634,11 @@ class LLMTranslator:
         """
         clean = prompt.strip()
         lower = clean.lower()
+        extra_args = dict(schema_hints) if schema_hints else {}
         if "przetestuj" in lower or "test" in lower:
-            return DSLCommand(entity="test", operation="run", arguments={"query": clean})
+            return DSLCommand(entity="test", operation="run", arguments={"query": clean, **extra_args})
         if "statystyki" in lower or "metrics" in lower:
-            return DSLCommand(entity="metrics", operation="list", arguments={"subject": clean})
+            return DSLCommand(entity="metrics", operation="list", arguments={"subject": clean, **extra_args})
 
         return None
 
