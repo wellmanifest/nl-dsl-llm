@@ -470,6 +470,7 @@ class DigitalTwinPromptSummarizer:
         )
 
         return {
+            "query": query,
             "prompt_snippet": prompt_str,
             "pruned_candidates": pruned,
             "candidate_count": len(pruned),

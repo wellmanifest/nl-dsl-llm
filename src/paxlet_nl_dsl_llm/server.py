@@ -204,6 +204,7 @@ class NLRuntimeEngine:
         winner = "qwen_08b" if res_08b.total_ms < res_2b.total_ms and res_08b.status == res_2b.status else "qwen_2b"
 
         return {
+            "client_id": client_id,
             "query": query,
             "result_qwen_2b": {
                 "model": "qwen3.5_2b",

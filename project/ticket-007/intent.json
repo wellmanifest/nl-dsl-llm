@@ -1,18 +1,21 @@
 {
   "schema": "new-project.intent/v3",
   "ticket": "ticket-007",
-  "summary": "Conversational stream purity and state URL sync conformance",
+  "summary": "Wire query and client_id kwargs and adopt Wellmanifest standards",
   "workstream": "integration",
   "classification": {
-    "kind": "FEATURE",
+    "kind": "BUG",
     "priority": "P2",
-    "origin": "requested"
+    "origin": "health"
   },
   "allowedPaths": [
     "project/ticket-007/**",
     "TODO.md",
     "project/TICKETS.md",
-    "spec/NL_DSL_LLM_SPECIFICATION.md"
+    ".governance/standard-adoption.json",
+    "src/paxlet_nl_dsl_llm/layers.py",
+    "src/paxlet_nl_dsl_llm/server.py",
+    ".governance/required-checks.json"
   ],
   "forbiddenPaths": [
     "project/ticket-*/user-*.md"
@@ -22,60 +25,65 @@
   "conflictsWith": [],
   "integrationTicket": null,
   "delivery": {
-    "acceptedBaseSha": "94dbcae5fb40e1aa029af3b7f6c7c4d00029b34a",
+    "acceptedBaseSha": "36ebd86093a462691ed07d08468d7448786f5a14",
     "targetBranch": "main",
-    "outcome": "Extend NL-DSL-LLM specification with conversational stream purity, dedicated process views, and bidirectional URL state synchronization (CONF-09, CONF-10).",
-    "nonGoals": [
-      "Alter gRPC protocol or core Trie engine",
-      "Break existing CONF-01..08 requirements"
-    ],
     "complexity": "S",
-    "estimatedMinutes": 30,
+    "estimatedMinutes": 20,
+    "outcome": "Wire `query` in `ContextPruningSummaryLayer.summarize` and `client_id` in `benchmark_both_models` (`PERF-AUDIT-KWARG-001`), and populate `.governance/standard-adoption.json`.",
+    "nonGoals": [
+      "No breaking changes to public APIs or runtime behavior."
+    ],
+    "runtimeDependencies": [],
     "budgets": {
-      "maxImplementationFiles": 3,
       "maxAffectedComponents": 2,
-      "maxPublicInterfaceChanges": 1,
+      "maxImplementationFiles": 5,
+      "maxPublicInterfaceChanges": 0,
       "maxRuntimeDependencies": 0
     },
     "architecture": {
       "status": "accepted",
-      "decision": "Add sections 3.7 and 3.8 to spec/NL_DSL_LLM_SPECIFICATION.md and checkpoints CONF-09, CONF-10 binding to wellmanifest/nl-uri-dsl-llm NUL-007 and NUL-008.",
+      "decision": "Wire `query` in `ContextPruningSummaryLayer.summarize` and `client_id` in `benchmark_both_models` (`PERF-AUDIT-KWARG-001`), and populate `.governance/standard-adoption.json`.",
       "components": [
         {
-          "name": "specification",
+          "name": "nl-dsl-llm-core",
           "paths": [
-            "spec/NL_DSL_LLM_SPECIFICATION.md"
-          ]
-        },
-        {
-          "name": "governance",
-          "paths": [
-            "project/ticket-007/**",
-            "project/TICKETS.md",
-            "TODO.md"
+            "src/paxlet_nl_dsl_llm/layers.py",
+            "src/paxlet_nl_dsl_llm/server.py",
+            ".governance/required-checks.json"
           ]
         }
       ],
-      "responsibilityChanges": false,
-      "interfaceChanges": [
-        "Adds CONF-09 and CONF-10 conformance criteria"
-      ],
+      "interfaceChanges": [],
       "dataChanges": [],
+      "responsibilityChanges": false,
+      "rollback": "Revert the ticket-007 commit.",
       "ui": {
         "impact": "none",
         "states": [],
         "evidence": []
-      },
-      "rollback": "Revert ticket-007 commit."
+      }
     },
-    "runtimeDependencies": [],
     "validation": [
       {
         "criterion": "AC-01",
         "commands": [
+          "pytest -q"
+        ],
+        "evidence": "All PERF-AUDIT findings resolved and verified by unit/smoke checks."
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "python3 .governance/standard_pack_check.py --root ."
+        ],
+        "evidence": "standard_pack_check.py reports findings=0 in enforce mode."
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
           "./project/governance-check.sh"
         ],
-        "evidence": "Managed scope and governance check pass."
+        "evidence": "governance-check.sh reports GOV-PASS."
       }
     ]
   }
