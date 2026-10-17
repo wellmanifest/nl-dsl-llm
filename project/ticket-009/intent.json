@@ -1,0 +1,81 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-009",
+  "summary": "Wire optional schema_hints parameter in LLMTranslator.translate",
+  "workstream": "integration",
+  "classification": {
+    "kind": "SERVICE",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "project/ticket-009/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "standard/nl_dsl_llm.py"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [
+    "python"
+  ],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "0210ce8d5ba17e43a3d2415c88ec5d066edfe881",
+    "targetBranch": "main",
+    "outcome": "Wire optional schema_hints parameter in LLMTranslator.translate and align standard adoption pack evidence with zero findings.",
+    "nonGoals": [
+      "No unrelated runtime or public contract changes"
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 25,
+    "budgets": {
+      "maxImplementationFiles": 5,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Extract loop helpers, wire optional parameters, and align standard-adoption pack evidence without altering external behavior.",
+      "components": [
+        {
+          "name": "performance-remediation",
+          "paths": [
+            "standard/nl_dsl_llm.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket branch commit or close the pull request before merge."
+    },
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 .governance/standard_pack_check.py --root .",
+          "./project/governance-check.sh"
+        ],
+        "evidence": "project/ticket-009/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "pytest -q"
+        ],
+        "evidence": "project/ticket-009/README.md"
+      }
+    ],
+    "runtimeDependencies": []
+  }
+}
