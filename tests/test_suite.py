@@ -244,3 +244,11 @@ def test_acoustic_and_keyboard_typo_tolerance():
         assert res["confidence"] >= 0.90
         assert res["status"] == "MATCHED"
 
+
+def test_ticket_008_all_modules_under_500_lines():
+    from pathlib import Path
+    pkg_dir = Path(__file__).resolve().parent.parent / "src" / "paxlet_nl_dsl_llm"
+    for path in sorted(pkg_dir.glob("*.py")):
+        lines = len(path.read_text(encoding="utf-8").splitlines())
+        assert lines <= 500, f"{path.name} has {lines} lines (> 500)"
+

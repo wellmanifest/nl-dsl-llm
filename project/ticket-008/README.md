@@ -1,25 +1,18 @@
-# Ticket 008: standardize pytest pythonpath and packaging configuration
+# Ticket 008: decompose layers module under 500 lines
 
 - **ID**: ticket-008
-- **Owner**: agent:gemini
+- **Owner**: unresolved:human
 - **Status**: IN_PROGRESS
-- **Workflow state**: VALIDATION
-- **Created**: 2026-10-05
+- **Workflow state**: EDIT
+- **Created**: 2026-10-18
 
 ## Goal and scope
 
-Standardize pytest testpaths and pythonpath configuration and package `__init__.py` markers across `wellmanifest/nl-dsl-llm` to ensure seamless standalone pytest execution matching child standard standards (`wellmanifest/nl-api-llm` and `wellmanifest/nl-uri-dsl-llm`).
+Decompose `src/paxlet_nl_dsl_llm/layers.py` into `layers.py` and `layers_compiler.py` so every Python module in `src/paxlet_nl_dsl_llm/` is <= 500 lines while preserving all public symbols and behavior.
 
 ## Acceptance criteria
 
-- [x] AC-01: `standard/__init__.py` package marker created.
-- [x] AC-02: `pyproject.toml` configures `testpaths = ["standard"]` and `pythonpath = ["."]`.
-- [x] AC-03: Full test suite passes directly with `pytest`.
-- [x] AC-04: `./project/governance-check.sh` passes with 0 errors and 0 warnings.
-
-## SESSION_EXECUTION_AUTHORIZATION
-
-User: "scalaj integruj , zadbaj o standaryzacje zaleznosci na poziomie wellmanifest/nl-*standardow".
+- [x] AC-01: Decompose `src/paxlet_nl_dsl_llm/layers.py` so every module in `src/paxlet_nl_dsl_llm/` is <= 500 lines with all tests passing.
 
 ## Tracking boundary
 
