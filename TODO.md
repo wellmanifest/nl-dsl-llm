@@ -7,3 +7,4 @@
 - [x] Ticket-004: WebSocket streaming protocol and live Option Network autocomplete
 - [x] Ticket-007: Conversational stream purity and state URL sync conformance (CONF-09, CONF-10)
 - [x] Ticket-008: Standardize pytest pythonpath and packaging configuration
+- [x] Ticket-010: System One and Jev-compatible typed decision layer for DSL and DockURI

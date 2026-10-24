@@ -1,0 +1,92 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-010",
+  "summary": "Add System One and Jev-compatible typed decision layer for DSL and DockURI",
+  "workstream": "integration",
+  "classification": {
+    "kind": "FEATURE",
+    "priority": "P2",
+    "origin": "requested"
+  },
+  "allowedPaths": [
+    "project/ticket-010/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "schemas/system-one-decision.schema.json",
+    "standard/system_one_decision.py",
+    "standard/test_system_one_decision.py"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [
+    "python"
+  ],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "f2d032684ab363460583d6403744bd9d5c816db7",
+    "targetBranch": "main",
+    "outcome": "Add schemas/system-one-decision.schema.json, standard/system_one_decision.py, and standard/test_system_one_decision.py implementing the System One / Jev-compatible typed decision layer for NL-DSL-LLM and DockURI.",
+    "nonGoals": [
+      "No external network calls during unit tests",
+      "No new mandatory runtime dependencies"
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 30,
+    "budgets": {
+      "maxImplementationFiles": 5,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Provide a standalone SystemOneDecisionEngine and SSOT profile registry in standard/system_one_decision.py backed by schemas/system-one-decision.schema.json that bridges OptionNode, DSLCommand, and DockURI proc:// candidates.",
+      "components": [
+        {
+          "name": "system-one-decision",
+          "paths": [
+            "schemas/system-one-decision.schema.json",
+            "standard/system_one_decision.py",
+            "standard/test_system_one_decision.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-010 merge commit."
+    },
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider"
+        ],
+        "evidence": "project/ticket-010/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "project/ticket-010/README.md"
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "python3 .governance/standard_pack_check.py --root ."
+        ],
+        "evidence": "project/ticket-010/README.md"
+      }
+    ],
+    "runtimeDependencies": []
+  }
+}
