@@ -77,8 +77,10 @@
       "integration": {
         "ownedPaths": [
           "VERSION",
+          "LICENSE*",
           "package.json",
           "pyproject.toml",
+          "Makefile",
           "go.mod",
           "Cargo.toml",
           "pom.xml",
@@ -94,7 +96,11 @@
           "profiles/**",
           "standard/**",
           "examples/**",
-          "spec/**"
+          "spec/**",
+          "src/**",
+          "tests/**",
+          "benchmarks/**",
+          "scripts/**"
         ]
       },
       "interfaces": {

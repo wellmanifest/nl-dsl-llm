@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# nl-dsl: CLI interface for wellmanifest/nl-dsl-llm standard
+# Fast dispatch for nl-dsl-sh and shell automation
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_CLIENT="${SCRIPT_DIR}/../python/nl_dsl_client.py"
+REPO_ROOT="${SCRIPT_DIR}/../.."
+
+# Fallback python path
+export PYTHONPATH="${REPO_ROOT}/src:${PYTHONPATH:-}"
+
+show_help() {
+  echo "Usage: nl-dsl <command> [arguments]"
+  echo ""
+  echo "Commands:"
+  echo "  ask <query>       Translate natural language query and display execution intent"
+  echo "  suggest <prefix>  Real-time autocomplete and option network DAG from Digital Twin"
+  echo "  dsl <action_id>   Execute canonical DSL action"
+  echo "  bench <query>     Compare execution across Qwen3.5-2B and Qwen3.5-0.8B"
+  echo "  help              Show this help message"
+}
+
+if [[ $# -lt 1 ]]; then
+  show_help
+  exit 1
+fi
+
+CMD="$1"
+shift
+
+case "${CMD}" in
+  ask)
+    if [[ $# -lt 1 ]]; then
+      echo "Error: 'ask' requires a query string."
+      exit 1
+    fi
+    QUERY="$*"
+    python3 "${PYTHON_CLIENT}" "${QUERY}"
+    ;;
+  suggest)
+    if [[ $# -lt 1 ]]; then
+      echo "Error: 'suggest' requires a partial query prefix."
+      exit 1
+    fi
+    QUERY="$*"
+    python3 "${PYTHON_CLIENT}" --suggest "${QUERY}"
+    ;;
+  dsl)
+    if [[ $# -lt 1 ]]; then
+      echo "Error: 'dsl' requires an action_id."
+      exit 1
+    fi
+    ACTION="$1"
+    python3 -c "from paxlet_nl_dsl_llm.server import NLRuntimeEngine; import json; e=NLRuntimeEngine(); print(json.dumps(e.execute('${ACTION}', {}), indent=2))"
+    ;;
+  bench)
+    if [[ $# -lt 1 ]]; then
+      echo "Error: 'bench' requires a query string."
+      exit 1
+    fi
+    QUERY="$*"
+    python3 -c "from paxlet_nl_dsl_llm.server import NLRuntimeEngine; import json; e=NLRuntimeEngine(); print(json.dumps(e.benchmark_both_models('${QUERY}'), indent=2, ensure_ascii=False))"
+    ;;
+  help|--help|-h)
+    show_help
+    ;;
+  *)
+    echo "Unknown command: ${CMD}"
+    show_help
+    exit 1
+    ;;
+esac

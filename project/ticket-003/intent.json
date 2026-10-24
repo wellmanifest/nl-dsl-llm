@@ -1,0 +1,77 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-003",
+  "summary": "Docker and systemd deployment for shared nl-runtime daemon",
+  "workstream": "infrastructure",
+  "classification": {
+    "kind": "SERVICE",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "Dockerfile*",
+    "compose*.yml",
+    "infra/**",
+    "project/ticket-003/**",
+    "project/TICKETS.md",
+    "TODO.md"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "df507c61d49f03d34a1ac410706b1a768d7df7ce",
+    "targetBranch": "main",
+    "outcome": "Deliver multi-stage production Dockerfile, Docker Compose topology with shared socket volume, and systemd service unit for the nl-runtime daemon.",
+    "nonGoals": [
+      "No direct push or merge to main without approval.",
+      "No external GPU drivers required."
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 30,
+    "budgets": {
+      "maxImplementationFiles": 5,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 0,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Provide multi-stage containerization in Dockerfile, multi-service deployment in compose.yml mounting shared socket volume /run/paxlet, and bare-metal service in infra/systemd/.",
+      "components": [
+        {
+          "name": "infrastructure",
+          "paths": [
+            "Dockerfile",
+            "compose.yml",
+            "infra/systemd/nl-runtime.service",
+            "infra/README.md"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the commit on ticket branch."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "Governance check passes with 0 errors and 0 warnings."
+      }
+    ]
+  }
+}

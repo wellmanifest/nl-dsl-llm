@@ -1,0 +1,28 @@
+services:
+  nl-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paxlet-nl-runtime
+    restart: unless-stopped
+    ports:
+      - "50051:50051"
+    volumes:
+      - paxlet_run:/run/paxlet
+    environment:
+      - NL_DSL_SOCKET=/run/paxlet/nl-dsl-llm.sock
+      - NL_DSL_PORT=50051
+      - OLLAMA_ENDPOINT=http://host.docker.internal:11434
+      - LLAMA_SERVER_2B=http://host.docker.internal:8081
+      - LLAMA_SERVER_08B=http://host.docker.internal:8082
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+
+volumes:
+  paxlet_run:
+    driver: local
