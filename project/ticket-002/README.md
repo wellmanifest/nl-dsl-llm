@@ -1,4 +1,4 @@
-# Ticket 002: gRPC transport parity, 4-tier pipeline, and paxlet adoption case study
+# Ticket 002: Client adapters for Taskand, Clonerd, and nl-dsl-sh
 
 - **ID**: ticket-002
 - **Owner**: human:tom
@@ -8,16 +8,15 @@
 
 ## Goal and scope
 
-Extend the `wellmanifest/nl-dsl-llm` standard specification and reference implementation to incorporate a 4-tier architecture (introducing Layer 1.5 Semantic Cache with strict Polarity & Slot Guards), standardize gRPC IPC transport parity alongside CLI, REST, and MCP, and document the runtime daemon adoption in `paxlet-com/nl-dsl-llm`.
+Provide production-grade client adapters for downstream consumers (Taskand, Clonerd, and `nl-dsl-sh`) to interact with the `paxlet-com/nl-dsl-llm` daemon over Unix Domain Sockets (`/run/paxlet/nl-dsl-llm.sock`) and TCP.
 
 ## Acceptance criteria
 
-- [x] AC-01: Update normative specification `spec/NL_DSL_LLM_SPECIFICATION.md` detailing the 4-tier pipeline and 4-interface parity (CLI, REST, MCP, gRPC).
-- [x] AC-02: Add Protobuf v1 definition `proto/wellmanifest/nl_dsl_llm/v1/runtime.proto` defining `NLRuntimeService` for high-performance IPC.
-- [x] AC-03: Extend reference standard `standard/nl_dsl_llm.py` and pytest suite `standard/test_conformance.py` with `SemanticCache` (Layer 1.5) and polarity guard verification.
-- [x] AC-04: Document runtime adoption in `examples/paxlet_runtime_adoption.md`.
-- [x] AC-05: Conformance self-tests (8/8) and governance checks pass (`./project/governance-check.sh`).
-- [x] AC-06: Real-time autocomplete and contextual Option Network engine with Digital Twin environment projection.
+- [x] AC-01: Native Node.js stream client `clients/node/taskand_nl_client.mjs` for Taskand `dev/chat` and `dev/llm`.
+- [x] AC-02: Standalone Python client `clients/python/nl_dsl_client.py` for Python daemons and Clonerd.
+- [x] AC-03: Executable Bash CLI `clients/bash/nl-dsl` for `nl-dsl-sh` interactive dispatch and benchmarking.
+- [x] AC-04: Documentation in `clients/README.md` compliant with `wellmanifest/docs` v2 Compact Profile.
+- [x] AC-05: Governance checks pass (`./project/governance-check.sh`).
 
 ## Tracking boundary
 

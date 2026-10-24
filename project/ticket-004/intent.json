@@ -1,7 +1,7 @@
 {
   "schema": "new-project.intent/v3",
   "ticket": "ticket-004",
-  "summary": "WebSocket streaming protocol and live Option Network autocomplete",
+  "summary": "standardize standard adoption and pytest configuration",
   "workstream": "integration",
   "classification": {
     "kind": "SERVICE",
@@ -9,13 +9,10 @@
     "origin": "health"
   },
   "allowedPaths": [
-    "spec/**",
-    "proto/**",
-    "standard/**",
-    "examples/**",
     "project/ticket-004/**",
+    "TODO.md",
     "project/TICKETS.md",
-    "TODO.md"
+    "pyproject.toml"
   ],
   "forbiddenPaths": [
     "project/ticket-*/user-*.md"
@@ -25,80 +22,63 @@
   "conflictsWith": [],
   "integrationTicket": null,
   "delivery": {
-    "acceptedBaseSha": "3424baf06735af4dbe6abbb99696bb50b4c31136",
+    "acceptedBaseSha": "1c576b63d3abbb4e8d8a566e6a731af5c817fe7c",
     "targetBranch": "main",
-    "outcome": "Formalize WebSocket bidirectional streaming protocol and live Option Network DAG autocomplete, implement reference streaming server, conformance tests, and example client.",
+    "outcome": "Standardize formal parent standard adoption of wellmanifest/nl-dsl-llm@0.1.0 in pyproject.toml and configure pytest pythonpath and cache_dir for clean isolated execution.",
     "nonGoals": [
-      "No direct push or merge to main without approval.",
-      "No remote API keys hardcoded."
+      "Alter core gRPC service implementation or pipeline layers",
+      "Add new runtime dependencies"
     ],
-    "complexity": "M",
-    "estimatedMinutes": 60,
+    "complexity": "L",
+    "estimatedMinutes": 30,
     "budgets": {
-      "maxImplementationFiles": 5,
-      "maxAffectedComponents": 3,
-      "maxPublicInterfaceChanges": 1,
-      "maxRuntimeDependencies": 0
+      "maxImplementationFiles": 3,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 0,
+      "maxRuntimeDependencies": 3
     },
     "architecture": {
       "status": "accepted",
-      "decision": "Add Section 3.5 & 3.6 to spec/NL_DSL_LLM_SPECIFICATION.md detailing WebSocket frame protocol and live Option Network autocomplete; implement standard/nl_dsl_llm_ws.py reference streaming server with zero external dependencies (standard library asyncio/websockets or lightweight async protocol); add standard/test_websocket_streaming.py; provide examples/websocket_streaming_client.py.",
+      "decision": "Declare adopts = [\"wellmanifest/nl-dsl-llm@0.1.0\"] under [tool.wellmanifest] in pyproject.toml, and configure pythonpath = [\"src\"] and cache_dir = \".subactor/cache/pytest\" under [tool.pytest.ini_options].",
       "components": [
         {
-          "name": "specification",
+          "name": "packaging",
           "paths": [
-            "spec/NL_DSL_LLM_SPECIFICATION.md"
+            "pyproject.toml"
           ]
         },
         {
-          "name": "standard-streaming",
+          "name": "governance",
           "paths": [
-            "standard/nl_dsl_llm.py",
-            "standard/nl_dsl_llm_ws.py",
-            "standard/test_websocket_streaming.py"
-          ]
-        },
-        {
-          "name": "examples",
-          "paths": [
-            "examples/websocket_streaming_client.py"
+            "project/ticket-004/**",
+            "project/TICKETS.md",
+            "TODO.md"
           ]
         }
       ],
       "responsibilityChanges": false,
-      "interfaceChanges": [
-        "Adds 5th interface parity surface: WebSocket bidirectional streaming protocol for chunked audio and live Option Network DAG autocomplete."
-      ],
+      "interfaceChanges": [],
       "dataChanges": [],
       "ui": {
         "impact": "none",
         "states": [],
         "evidence": []
       },
-      "rollback": "Revert the commit on ticket branch."
+      "rollback": "Revert ticket-004 commit."
     },
-    "runtimeDependencies": [],
+    "runtimeDependencies": [
+      "grpcio",
+      "protobuf",
+      "pydantic"
+    ],
     "validation": [
       {
         "criterion": "AC-01",
         "commands": [
-          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider standard/test_websocket_streaming.py"
-        ],
-        "evidence": "WebSocket streaming conformance tests pass."
-      },
-      {
-        "criterion": "AC-02",
-        "commands": [
-          "python3 -B examples/websocket_streaming_client.py --benchmark"
-        ],
-        "evidence": "Streaming latency benchmark demonstrates sub-50ms DAG projection updates."
-      },
-      {
-        "criterion": "AC-03",
-        "commands": [
+          "pytest",
           "./project/governance-check.sh"
         ],
-        "evidence": "Governance check passes with 0 errors and 0 warnings."
+        "evidence": "Pytest passes 11/11 tests directly and governance check passes with 0 errors, 0 warnings."
       }
     ]
   }

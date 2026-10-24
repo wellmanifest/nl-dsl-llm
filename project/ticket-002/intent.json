@@ -1,22 +1,18 @@
 {
   "schema": "new-project.intent/v3",
   "ticket": "ticket-002",
-  "summary": "gRPC transport parity, 4-tier pipeline, and paxlet adoption case study",
-  "workstream": "integration",
+  "summary": "Client adapters for Taskand, Clonerd, and nl-dsl-sh",
+  "workstream": "interfaces",
   "classification": {
     "kind": "SERVICE",
     "priority": "P2",
     "origin": "health"
   },
   "allowedPaths": [
-    "spec/**",
-    "proto/**",
-    "standard/**",
-    "examples/**",
+    "clients/**",
     "project/ticket-002/**",
     "project/TICKETS.md",
-    "TODO.md",
-    ".github/workflows/ci.yml"
+    "TODO.md"
   ],
   "forbiddenPaths": [
     "project/ticket-*/user-*.md"
@@ -26,62 +22,38 @@
   "conflictsWith": [],
   "integrationTicket": null,
   "delivery": {
-    "acceptedBaseSha": "2040efe37b9eb898350f3fec0285a2d4e69d4e34",
+    "acceptedBaseSha": "df507c61d49f03d34a1ac410706b1a768d7df7ce",
     "targetBranch": "main",
-    "outcome": "Formalize 4-tier architecture with Layer 1.5 Semantic Cache, add high-performance gRPC IPC definition, update reference standard and conformance test suite, and provide paxlet runtime adoption case study.",
+    "outcome": "Deliver high-performance client adapters for Taskand (Node.js), nl-dsl-sh (Bash CLI), and Python runtimes over Unix Domain Socket and TCP.",
     "nonGoals": [
       "No direct push or merge to main without approval.",
-      "No remote API keys hardcoded."
+      "No external network dependencies required for local fast-path."
     ],
-    "complexity": "L",
-    "estimatedMinutes": 60,
+    "complexity": "S",
+    "estimatedMinutes": 30,
     "budgets": {
-      "maxImplementationFiles": 15,
-      "maxAffectedComponents": 5,
-      "maxPublicInterfaceChanges": 3,
+      "maxImplementationFiles": 5,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 1,
       "maxRuntimeDependencies": 0
     },
     "architecture": {
       "status": "accepted",
-      "decision": "Extend normative specification with Layer 1.5 Semantic Cache (polarity/slot guard) and Section 3.4 gRPC IPC; declare Protobuf v1 contract under proto/; add Layer 1.5 to reference standard standard/nl_dsl_llm.py and conformance tests standard/test_conformance.py; document adoption under examples/paxlet_runtime_adoption.md.",
+      "decision": "Implement client integration layer under clients/ with native Node.js socket streaming for Taskand, Python client for daemons, and standalone bash CLI for nl-dsl-sh.",
       "components": [
         {
-          "name": "specification",
+          "name": "clients",
           "paths": [
-            "spec/NL_DSL_LLM_SPECIFICATION.md"
-          ]
-        },
-        {
-          "name": "proto",
-          "paths": [
-            "proto/wellmanifest/nl_dsl_llm/v1/runtime.proto"
-          ]
-        },
-        {
-          "name": "standard-reference",
-          "paths": [
-            "standard/nl_dsl_llm.py",
-            "standard/test_conformance.py",
-            "standard/domain_showcase.py"
-          ]
-        },
-        {
-          "name": "examples",
-          "paths": [
-            "examples/paxlet_runtime_adoption.md",
-            "examples/domain_adoption_matrix.md"
-          ]
-        },
-        {
-          "name": "ci",
-          "paths": [
-            ".github/workflows/ci.yml"
+            "clients/node/taskand_nl_client.mjs",
+            "clients/python/nl_dsl_client.py",
+            "clients/bash/nl-dsl",
+            "clients/README.md"
           ]
         }
       ],
       "responsibilityChanges": false,
       "interfaceChanges": [
-        "Adds 4th interface parity surface: gRPC IPC via paxlet.nl_dsl_llm.v1.NLRuntimeService."
+        "Adds downstream client interfaces under clients/node/, clients/python/, and clients/bash/."
       ],
       "dataChanges": [],
       "ui": {
@@ -96,26 +68,19 @@
       {
         "criterion": "AC-01",
         "commands": [
-          "python3 standard/nl_dsl_llm.py --self-test"
+          "./clients/bash/nl-dsl ask 'pokaż status cpu'"
         ],
-        "evidence": "Standard conformance self-test suite passes with 8/8 checks."
+        "evidence": "CLI client correctly resolves to monitor.cpu_status via fast-path."
       },
       {
         "criterion": "AC-02",
         "commands": [
-          "pytest standard/test_conformance.py"
+          "python3 clients/python/nl_dsl_client.py 'pokaż status cpu'"
         ],
-        "evidence": "Pytest conformance suite passes 8/8 tests."
+        "evidence": "Python client successfully communicates with engine."
       },
       {
         "criterion": "AC-03",
-        "commands": [
-          "python3 standard/domain_showcase.py"
-        ],
-        "evidence": "Multi-domain showcase verifies Taskand, Clonerd, SRE, and Voice-CLI execution."
-      },
-      {
-        "criterion": "AC-04",
         "commands": [
           "./project/governance-check.sh"
         ],

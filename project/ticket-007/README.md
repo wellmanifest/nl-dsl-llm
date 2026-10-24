@@ -1,20 +1,19 @@
-# Ticket 007: Conversational stream purity and state URL sync conformance
+# ticket-007: Wire query and client_id kwargs and adopt Wellmanifest standards
 
 - **ID**: ticket-007
 - **Owner**: agent:antigravity
 - **Status**: IN_PROGRESS
 - **Workflow state**: EDIT
-- **Created**: 2026-10-04
+- **Created**: 2026-10-17
 
 ## Goal and scope
 
-SESSION_EXECUTION_AUTHORIZATION: The user requested extending wellmanifest/nl-* standards with conversational stream purity, process view separation, and bidirectional URL state synchronization tested in practice.
-In `wellmanifest/nl-dsl-llm`, update `spec/NL_DSL_LLM_SPECIFICATION.md`:
-1. Add section 3.7: Conversational Stream Purity & Dedicated Process View (NUL-007 Binding).
-2. Add section 3.8: Bidirectional Interactive State URL Synchronization (NUL-008 Binding).
-3. Add conformance criteria [CONF-09] (Conversational Stream Purity) and [CONF-10] (Deterministic Bidirectional State URL Sync).
+Wire `query` in `ContextPruningSummaryLayer.summarize` and `client_id` in `benchmark_both_models` (`PERF-AUDIT-KWARG-001`), and populate `.governance/standard-adoption.json`.
+
+SESSION_EXECUTION_AUTHORIZATION: User authorized autonomous execution of PERF-AUDIT remediation and Wellmanifest standard adoption in session 57c04ad1-83e7-411b-86da-41eeeeb0570b.
 
 ## Acceptance criteria
 
-- [x] AC-01: Update `spec/NL_DSL_LLM_SPECIFICATION.md` with sections 3.7, 3.8 and conformance criteria CONF-09, CONF-10.
-- [x] AC-02: Native governance check (`./project/governance-check.sh`) passes without errors.
+- [x] AC-01: Wire `query` in `src/paxlet_nl_dsl_llm/layers.py` and `client_id` in `src/paxlet_nl_dsl_llm/server.py` (`PERF-AUDIT-KWARG-001`).
+- [x] AC-02: Populate `.governance/standard-adoption.json` so `python3 .governance/standard_pack_check.py --root . --strict` reports `findings=0`.
+- [x] AC-03: Pass `./project/governance-check.sh` (`GOV-PASS`).

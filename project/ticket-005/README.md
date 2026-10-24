@@ -1,19 +1,20 @@
-# Ticket 005: Fix pycache gitignore leak and pytest sessionstart failure
+# Ticket 005: adopt-wellmanifest-docs-compact-v2-architecture-overview
 
 - **ID**: ticket-005
 - **Owner**: unresolved:human
 - **Status**: IN_PROGRESS
 - **Workflow state**: EDIT
-- **Created**: 2026-09-28
+- **Created**: 2026-10-07
 
 ## Goal and scope
 
-Prevent Python bytecode (`__pycache__/`, `*.pyc`) from leaking into git status and breaking `wellmanifest_governance.py` during `pytest_sessionstart`.
+Adopt `wellmanifest/docs` Compact v2 standard by updating `docs/README.md` with schema frontmatter and creating `docs/INFORMATION/OVERVIEW.md` architecture specification.
 
 ## Acceptance criteria
 
-- [x] AC-01: `.gitignore` ignores `__pycache__/` and Python bytecode files.
-- [x] AC-02: Running `pytest` does not produce dirty untracked git files triggering GOV-TICKET-001.
+- [x] AC-01: `docs/README.md` includes `schema: wellmanifest.docs/document/v2` frontmatter.
+- [x] AC-02: `docs/INFORMATION/OVERVIEW.md` provides architectural specification conforming to `wellmanifest.docs/document/v2`.
+- [x] AC-03: Governance check exits with 0 errors and 0 warnings.
 
 ## Tracking boundary
 

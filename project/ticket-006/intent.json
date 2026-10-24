@@ -1,21 +1,19 @@
 {
   "schema": "new-project.intent/v3",
   "ticket": "ticket-006",
-  "summary": "Semantic multilingual NL to validated operation plan",
+  "summary": "add-standard-proprietary-license",
   "workstream": "integration",
   "classification": {
-    "kind": "FEATURE",
+    "kind": "SERVICE",
     "priority": "P2",
-    "origin": "requested"
+    "origin": "health"
   },
   "allowedPaths": [
     "project/ticket-006/**",
     "TODO.md",
     "project/TICKETS.md",
-    "schemas/nl-plan.schema.json",
-    "spec/SEMANTIC_NL_PLAN.md",
-    "standard/semantic-profile.json",
-    "standard/test_semantic_profile.py"
+    ".governance/manifest.json",
+    "LICENSE"
   ],
   "forbiddenPaths": [
     "project/ticket-*/user-*.md"
@@ -25,64 +23,50 @@
   "conflictsWith": [],
   "integrationTicket": null,
   "delivery": {
-    "acceptedBaseSha": "e15d45d18c8d67327f15a0bd8e065879a8ba6e64",
+    "acceptedBaseSha": "045e2bc45ce4662b0bc4d7f435239883f6a3a5dc",
     "targetBranch": "main",
-    "outcome": "Publish the optional semantic-v1 multilingual contract retrieval and validated NL plan profile, with conformance tests.",
+    "outcome": "Add standard Wellmanifest proprietary license and map LICENSE* in governance workstream manifest",
     "nonGoals": [
-      "No model performance guarantee or mandatory vendor.",
-      "No mutation of other active tickets or execution authority derived from model output."
+      "No runtime engine changes"
     ],
-    "complexity": "M",
-    "estimatedMinutes": 90,
+    "complexity": "XS",
+    "estimatedMinutes": 10,
     "budgets": {
-      "maxImplementationFiles": 4,
-      "maxAffectedComponents": 3,
-      "maxPublicInterfaceChanges": 1,
+      "maxImplementationFiles": 2,
+      "maxAffectedComponents": 1,
+      "maxPublicInterfaceChanges": 0,
       "maxRuntimeDependencies": 0
     },
     "architecture": {
       "status": "accepted",
-      "decision": "Define one catalog-specialized typed call/sequence IR and adopt the shared Dockuri compiler through an injected planner; keep legacy matching only as an explicitly separate compatibility profile.",
+      "decision": "Add canonical LICENSE file and declare LICENSE* in manifest.json governance workstream ownedPaths",
       "components": [
         {
-          "name": "semantic-profile",
+          "name": "governance",
           "paths": [
-            "spec/SEMANTIC_NL_PLAN.md",
-            "schemas/nl-plan.schema.json",
-            "standard/semantic-profile.json",
-            "standard/test_semantic_profile.py"
+            "LICENSE",
+            ".governance/manifest.json"
           ]
         }
       ],
       "responsibilityChanges": false,
-      "interfaceChanges": [
-        "Adds optional semantic-v1 profile."
-      ],
-      "dataChanges": [
-        "Adds wellmanifest.nl-plan/v1 envelope."
-      ],
+      "interfaceChanges": [],
+      "dataChanges": [],
       "ui": {
         "impact": "none",
         "states": [],
         "evidence": []
       },
-      "rollback": "Revert only this ticket commit."
+      "rollback": "Remove LICENSE and revert .governance/manifest.json"
     },
     "runtimeDependencies": [],
     "validation": [
       {
         "criterion": "AC-01",
         "commands": [
-          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider standard/test_semantic_profile.py"
-        ],
-        "evidence": "Profile and adapter conformance pass."
-      },
-      {
-        "criterion": "AC-02",
-        "commands": [
           "./project/governance-check.sh"
         ],
-        "evidence": "Managed scope and governance pass."
+        "evidence": "GOV-PASS"
       }
     ]
   }

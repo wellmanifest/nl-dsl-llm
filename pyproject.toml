@@ -5,10 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "wellmanifest-nl-dsl-llm"
 version = "0.1.0"
-description = "Normative specification, schemas, and reference implementation for the NL-DSL-LLM architectural pattern"
+description = "Normative specification, schemas, and reference implementation for the NL-DSL-LLM architectural pattern; includes the paxlet gRPC runtime service and dual Qwen benchmark harness"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "grpcio>=1.60.0",
+    "protobuf>=4.25.0",
     "pydantic>=2.0.0",
 ]
 
@@ -16,13 +18,27 @@ dependencies = [
 test = [
     "pytest>=8.0.0",
 ]
+dev = [
+    "pytest>=7.0.0",
+    "grpcio-tools>=1.60.0",
+]
+inference = [
+    "litellm>=1.0.0",
+    "onnxruntime>=1.16.0",
+    "httpx>=0.25.0",
+]
 
 [tool.wellmanifest]
 standard = "0.20.32"
 revision = "b6ba9c21a65a6a5648ecf904b64c3b75295e136f"
 gate = "project/governance-check.sh"
+adopts = [
+    "wellmanifest/nl-dsl-llm@0.1.0",
+]
 
 [tool.pytest.ini_options]
 addopts = "-p wellmanifest_governance"
-testpaths = ["standard"]
-pythonpath = ["."]
+testpaths = ["standard", "tests"]
+python_files = ["test_*.py"]
+pythonpath = [".", "src"]
+cache_dir = ".subactor/cache/pytest"

@@ -1,21 +1,25 @@
-# Ticket 001: normative specification and reference implementation for NL-DSL-LLM
+# Ticket 001: gRPC runtime and dual Qwen benchmark suite
 
 - **ID**: ticket-001
-- **Owner**: human:tom
+- **Owner**: unresolved:human
 - **Status**: IN_PROGRESS
-- **Workflow state**: VALIDATION
-- **Created**: 2026-09-18
+- **Workflow state**: EDIT
+- **Created**: 2026-09-26
 
 ## Goal and scope
 
-Define the normative specification, JSON schemas, standard profiles, and reference implementation for the NL-DSL-LLM pattern across interfaces (CLI shell, Web REST API, MCP).
+Implement the production gRPC runtime service and evaluation harness for `paxlet-com/nl-dsl-llm`.
+Provides low-latency IPC for Taskand, Clonerd, and nl-dsl-sh, with comparative benchmarking
+for Qwen3.5-2B and Qwen3.5-0.8B running on local CPU via `llama.cpp` + LiteLLM.
 
 ## Acceptance criteria
 
-- [x] AC-01: Normative specification document `spec/NL_DSL_LLM_SPECIFICATION.md` detailing the 3-layer pattern (NL, DSL, LLM fallback) and interface parity (CLI, REST API, MCP).
-- [x] AC-02: JSON Schemas in `schemas/` for DSL request, execution result, MCP tools, and REST API contracts.
-- [x] AC-03: Self-testing Python reference standard/conformance suite in `standard/` and `examples/`.
-- [x] AC-04: Governance checks pass (`./project/governance-check.sh`).
+- [x] AC-01: Normative Protobuf contract defined in `proto/paxlet/nl_dsl_llm/v1/runtime.proto`.
+- [x] AC-02: Python gRPC server implementing `NLRuntimeService` with UDS and TCP support.
+- [x] AC-03: 4-layer resolution engine (Regex Fast-Path, Semantic Cache with slot/negation guard, LLM fallback).
+- [x] AC-04: Dual-model benchmark harness comparing Qwen3.5-2B vs Qwen3.5-0.8B on VPS CPU.
+- [x] AC-05: Documentation adhering to `wellmanifest/docs` v2 compact profile.
+- [x] AC-06: Verification passes `./project/governance-check.sh` and test suite.
 
 ## Tracking boundary
 
