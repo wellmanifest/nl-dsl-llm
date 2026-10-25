@@ -1,0 +1,96 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-011",
+  "summary": "Eliminate NOHARDCODE-001/007 findings and add canonical System One selector contract (#10)",
+  "workstream": "integration",
+  "classification": {
+    "kind": "FEATURE",
+    "priority": "P2",
+    "origin": "requested"
+  },
+  "allowedPaths": [
+    "project/ticket-011/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "examples/websocket_streaming_client.py",
+    "standard/domain_showcase.py",
+    "standard/nl_dsl_llm.py",
+    "standard/system_one_decision.py",
+    "standard/test_websocket_streaming.py"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [
+    "python"
+  ],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "4f20718e2f8410caa5943b196e80aeae66bfe1bf",
+    "targetBranch": "main",
+    "outcome": "Eliminate all NOHARDCODE-001 and NOHARDCODE-007 findings across examples/ and standard/ and expose build_selection_question and select_operation (op_0..op_N bindings, none, need_clarification, need_multi_step, registry_digest, 6 safety gates) in standard/system_one_decision.py.",
+    "nonGoals": [
+      "No external network calls during unit tests",
+      "No new mandatory runtime dependencies"
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 30,
+    "budgets": {
+      "maxImplementationFiles": 5,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Externalize WebSocket URLs and model profiles via environment variables in standard/ and examples/, and add build_selection_question and select_operation to standard/system_one_decision.py.",
+      "components": [
+        {
+          "name": "nl-dsl-llm-standard",
+          "paths": [
+            "examples/websocket_streaming_client.py",
+            "standard/domain_showcase.py",
+            "standard/nl_dsl_llm.py",
+            "standard/system_one_decision.py",
+            "standard/test_websocket_streaming.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-011 merge commit."
+    },
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider"
+        ],
+        "evidence": "project/ticket-011/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "project/ticket-011/README.md"
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "python3 .governance/standard_pack_check.py --root ."
+        ],
+        "evidence": "project/ticket-011/README.md"
+      }
+    ],
+    "runtimeDependencies": []
+  }
+}
