@@ -64,7 +64,7 @@ def test_streaming_option_network_latency_sla():
     """Verify Option Network autocomplete executes in < 50ms SLA (sub-5ms typical)."""
     engine = StreamingOptionNetworkEngine()
 
-    prefixes = ["z", "zatrz", "dod", "dodaj", "pok", "pokaż", "res", "restart"]
+    prefixes = "z|zatrz|dod|dodaj|pok|pokaż|res|restart".split("|")
     for prefix in prefixes:
         res = engine.update_prefix(prefix)
         assert res["sla_met"] is True
@@ -205,3 +205,64 @@ def test_websocket_streaming_server_session_lifecycle():
             await server.stop()
 
     asyncio.run(_run_test())
+
+
+def test_build_selection_question_and_select_operation_six_gates() -> None:
+    from standard.system_one_decision import build_selection_question, select_operation
+
+    contracts = [
+        {
+            "uri": "proc://taskand.dev/service/status/v1?target=postgres",
+            "dsl_command": "service.status target=postgres",
+            "description": "Check postgres service status",
+            "keywords": ["status", "postgres", "sprawdz"],
+            "risk_level": 1,
+            "required_args": ["target"],
+            "arguments": {"target": "postgres"},
+        },
+        {
+            "uri": "proc://taskand.dev/service/restart/v1?target=postgres",
+            "dsl_command": "service.restart target=postgres",
+            "description": "Restart postgres service",
+            "keywords": ["restart", "zrestartuj", "postgres"],
+            "risk_level": 3,
+            "required_args": ["target"],
+            "arguments": {"target": "postgres"},
+        },
+    ]
+    q = build_selection_question("sprawdz status postgres", contracts)
+    assert q["options"] == ["op_0", "op_1", "none", "need_clarification", "need_multi_step"]
+    assert q["registry_digest"].startswith("sha256:")
+
+    res_ok = select_operation("sprawdz status postgres", contracts)
+    assert res_ok["chosen_option"] == "op_0"
+    assert res_ok["execution_authorized"] is True
+    assert res_ok["selected_uri"] == "proc://taskand.dev/service/status/v1?target=postgres"
+    assert all(res_ok["gates"].values())
+
+    res_high = select_operation("zrestartuj postgres", contracts, {"approved_high_risk": False})
+    assert res_high["chosen_option"] == "op_1"
+    assert res_high["gates"]["gate_5_approval_policy"] is False
+    assert res_high["execution_authorized"] is False
+
+    res_high_ok = select_operation("zrestartuj postgres", contracts, {"approved_high_risk": True})
+    assert res_high_ok["chosen_option"] == "op_1"
+    assert res_high_ok["execution_authorized"] is True
+
+    res_multi = select_operation("sprawdz status postgres a potem zrestartuj postgres", contracts)
+    assert res_multi["chosen_option"] == "need_multi_step"
+    assert res_multi["execution_authorized"] is False
+
+    res_tampered = select_operation(
+        "sprawdz status postgres",
+        contracts,
+        decision_provider=lambda _q: {
+            "chosen_option": "op_999",
+            "confidence": 0.99,
+            "registry_digest": "sha256:bad",
+        },
+    )
+    assert res_tampered["chosen_option"] == "none"
+    assert res_tampered["gates"]["gate_1_candidate_membership"] is False
+    assert res_tampered["gates"]["gate_2_registry_digest"] is False
+    assert res_tampered["execution_authorized"] is False

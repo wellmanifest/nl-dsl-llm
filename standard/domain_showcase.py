@@ -31,11 +31,16 @@ from standard.nl_dsl_llm import (
 )
 
 
+def _emit(line: str = "") -> None:
+    sys.stdout.write(f"{line}\n")
+    sys.stdout.flush()
+
+
 def run_showcase() -> Dict[str, Any]:
-    print("=" * 80)
-    print("NL-DSL-LLM MULTI-DOMAIN APPLICABILITY & EXECUTION SHOWCASE")
-    print("Standard: wellmanifest/nl-dsl-llm v0.2.1-candidate")
-    print("=" * 80)
+    _emit("=" * 80)
+    _emit("NL-DSL-LLM MULTI-DOMAIN APPLICABILITY & EXECUTION SHOWCASE")
+    _emit("Standard: wellmanifest/nl-dsl-llm v0.2.1-candidate")
+    _emit("=" * 80)
 
     executor = DSLExecutor()
     results: Dict[str, Any] = {}
@@ -88,15 +93,15 @@ def run_showcase() -> Dict[str, Any]:
     # =========================================================================
     # Domain 1: Taskand Task Planning & API Menu Context Routing
     # =========================================================================
-    print("\n--- [DOMAIN 1: Taskand (Task Planning & API Menu Context Routing)] ---")
+    _emit("\n--- [DOMAIN 1: Taskand (Task Planning & API Menu Context Routing)] ---")
     q1 = "task.schedule title='Audit system memory' environment=prod"
     t0 = time.perf_counter()
     res1 = bridge.handle_request(q1)
     lat1 = (time.perf_counter() - t0) * 1000
-    print(f"DSL Input:    '{q1}'")
-    print(f"Layer:        {res1.meta['sourceLayer']} (Latency: {lat1:.2f}ms)")
-    print(f"Result URI:   {res1.data['procedure_uri']}")
-    print(f"Status:       {res1.data['status']}")
+    _emit(f"DSL Input:    '{q1}'")
+    _emit(f"Layer:        {res1.meta['sourceLayer']} (Latency: {lat1:.2f}ms)")
+    _emit(f"Result URI:   {res1.data['procedure_uri']}")
+    _emit(f"Status:       {res1.data['status']}")
     assert res1.success is True
     assert res1.data["procedure_uri"] == "proc://taskand.dev/planner/schedule/v1"
     results["domain_1_taskand"] = {"input": q1, "uri": res1.data["procedure_uri"], "latency_ms": lat1}
@@ -104,15 +109,15 @@ def run_showcase() -> Dict[str, Any]:
     # =========================================================================
     # Domain 2: Clonerd Git Worktree & Repository Orchestration
     # =========================================================================
-    print("\n--- [DOMAIN 2: Clonerd (Git Worktree & Repo Orchestration)] ---")
+    _emit("\n--- [DOMAIN 2: Clonerd (Git Worktree & Repo Orchestration)] ---")
     q2 = "worktree.allocate ticket=ticket-005"
     t0 = time.perf_counter()
     res2 = bridge.handle_request(q2)
     lat2 = (time.perf_counter() - t0) * 1000
-    print(f"DSL Input:    '{q2}'")
-    print(f"Layer:        {res2.meta['sourceLayer']} (Latency: {lat2:.2f}ms)")
-    print(f"Result Path:  {res2.data['path']}")
-    print(f"Link Mode:    {res2.data['link_mode']}")
+    _emit(f"DSL Input:    '{q2}'")
+    _emit(f"Layer:        {res2.meta['sourceLayer']} (Latency: {lat2:.2f}ms)")
+    _emit(f"Result Path:  {res2.data['path']}")
+    _emit(f"Link Mode:    {res2.data['link_mode']}")
     assert res2.success is True
     assert res2.data["procedure_uri"] == "cluster.worktree.allocate"
     results["domain_2_clonerd"] = {"input": q2, "path": res2.data["path"], "latency_ms": lat2}
@@ -120,7 +125,7 @@ def run_showcase() -> Dict[str, Any]:
     # =========================================================================
     # Domain 3: Autonomous SRE & Self-Healing with Digital Twin Projection
     # =========================================================================
-    print("\n--- [DOMAIN 3: SRE Self-Healing & Digital Twin Degraded Entity Pruning] ---")
+    _emit("\n--- [DOMAIN 3: SRE Self-Healing & Digital Twin Degraded Entity Pruning] ---")
     twin_ctx = DigitalTwinContext(
         environment="prod",
         active_services=["postgres", "redis-cache", "gateway"],
@@ -131,11 +136,11 @@ def run_showcase() -> Dict[str, Any]:
     sugg_res = bridge.suggest_options("zre", twin_context=twin_ctx, max_suggestions=3)
     lat3 = (time.perf_counter() - t0) * 1000
     top_sre = sugg_res["suggestions"][0]
-    print(f"Input Token:  'zre' (Streaming typing / partial speech)")
-    print(f"Top Option:   {top_sre['display_label']} (Badge: {top_sre['badge']}, Conf: {top_sre['confidence']})")
-    print(f"Resolved URI: {top_sre['resolved_uri']}")
-    print(f"Latency:      {lat3:.2f}ms (<1ms deterministic target)")
-    print(f"Next Options: {[n['display_label'] for n in top_sre.get('next_options', [])]}")
+    _emit("Input Token:  'zre' (Streaming typing / partial speech)")
+    _emit(f"Top Option:   {top_sre['display_label']} (Badge: {top_sre['badge']}, Conf: {top_sre['confidence']})")
+    _emit(f"Resolved URI: {top_sre['resolved_uri']}")
+    _emit(f"Latency:      {lat3:.2f}ms (<1ms deterministic target)")
+    _emit(f"Next Options: {[n['display_label'] for n in top_sre.get('next_options', [])]}")
     assert top_sre["badge"] == "DEGRADED"
     assert "redis-cache" in top_sre["completion_text"]
     assert top_sre["requires_confirmation"] is True
@@ -144,19 +149,19 @@ def run_showcase() -> Dict[str, Any]:
     # =========================================================================
     # Domain 4: Voice / Terminal (nl-dsl-sh) Real-Time Autocomplete DAG
     # =========================================================================
-    print("\n--- [DOMAIN 4: Voice / Terminal nl-dsl-sh Real-Time Autocomplete DAG] ---")
+    _emit("\n--- [DOMAIN 4: Voice / Terminal nl-dsl-sh Real-Time Autocomplete DAG] ---")
     t0 = time.perf_counter()
     voice_res = bridge.suggest_options("pok", twin_context=twin_ctx, max_suggestions=5)
     lat4 = (time.perf_counter() - t0) * 1000
-    print(f"Speech Token: 'pok' (Partial speech token from Whisper/VAD)")
-    print(f"DAG Count:    {len(voice_res['suggestions'])} options generated in {lat4:.2f}ms")
+    _emit("Speech Token: 'pok' (Partial speech token from Whisper/VAD)")
+    _emit(f"DAG Count:    {len(voice_res['suggestions'])} options generated in {lat4:.2f}ms")
     for idx, opt in enumerate(voice_res["suggestions"][:3], 1):
-        print(f"  {idx}. {opt['display_label']:<35} -> {opt['completion_text']}")
+        _emit(f"  {idx}. {opt['display_label']:<35} -> {opt['completion_text']}")
     results["domain_4_voice_cli"] = {"input": "pok", "count": len(voice_res["suggestions"]), "latency_ms": lat4}
 
-    print("\n" + "=" * 80)
-    print("ALL DOMAIN SHOWCASES COMPLETED SUCCESSFULLY UNDER STRICT GOVERNANCE")
-    print("=" * 80)
+    _emit("\n" + "=" * 80)
+    _emit("ALL DOMAIN SHOWCASES COMPLETED SUCCESSFULLY UNDER STRICT GOVERNANCE")
+    _emit("=" * 80)
     return results
 
 

@@ -8,13 +8,14 @@ wellmanifest/dsl, wellmanifest/policy-dsl, and wellmanifest/nl-*.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from standard.nl_dsl_llm import DigitalTwinContext, DSLCommand, OptionNetworkEngine, OptionNode
 
@@ -519,3 +520,155 @@ def validate_system_one_decision_envelope(envelope: Mapping[str, Any]) -> None:
             raise ValueError(f"Invalid probability value in {group_name}")
         if abs(sum(vals) - 1.0) > 1e-4:
             raise ValueError(f"Probabilities in {group_name} must sum to 1.0")
+
+
+SPECIAL_OUTCOMES: Tuple[str, ...] = ("none", "need_clarification", "need_multi_step")
+
+
+def _compute_registry_digest(candidate_contracts: Sequence[Mapping[str, Any]]) -> str:
+    canonical = json.dumps(
+        [
+            {
+                "uri": str(c.get("uri", "")),
+                "dsl_command": str(c.get("dsl_command", c.get("action_id", ""))),
+                "description": str(c.get("description", "")),
+                "risk_level": int(c.get("risk_level", 1)),
+            }
+            for c in candidate_contracts
+        ],
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def build_selection_question(
+    request: str,
+    candidate_contracts: Sequence[Mapping[str, Any]],
+    bounded_context: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Builds the canonical System One / Jev choice question with op_0..op_N bindings and 3 escape outcomes."""
+    ctx = dict(bounded_context or {})
+    bindings: Dict[str, Dict[str, Any]] = {}
+    options: List[str] = []
+    for idx, contract in enumerate(candidate_contracts[:252]):
+        op_id = f"op_{idx}"
+        options.append(op_id)
+        bindings[op_id] = dict(contract)
+    options.extend(SPECIAL_OUTCOMES)
+    return {
+        "request": request,
+        "registry_digest": _compute_registry_digest(candidate_contracts),
+        "bounded_context": ctx,
+        "options": options,
+        "bindings": bindings,
+        "questions": [
+            {"name": "operation_choice", "type": "choice", "options": options},
+            {"name": "read_only_intent", "type": "noul", "options": ["yes", "no"]},
+            {"name": "risk_score", "type": "score", "options": ["1", "2", "3"]},
+        ],
+    }
+
+
+def select_operation(
+    request: str,
+    candidate_contracts: Sequence[Mapping[str, Any]],
+    bounded_context: Optional[Mapping[str, Any]] = None,
+    *,
+    decision_provider: Optional[Callable[[Mapping[str, Any]], Mapping[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Canonical System One / Jev operation selector enforcing op_0..op_N bindings and 6 safety gates."""
+    ctx = dict(bounded_context or {})
+    question_spec = build_selection_question(request, candidate_contracts, ctx)
+    bindings: Dict[str, Dict[str, Any]] = question_spec["bindings"]
+    options: List[str] = question_spec["options"]
+    expected_digest = question_spec["registry_digest"]
+
+    q_lower = request.strip().lower()
+    q_tokens = _tokenize(q_lower)
+
+    if decision_provider is not None:
+        raw_decision = dict(decision_provider(question_spec))
+        chosen_option = str(raw_decision.get("chosen_option", "none"))
+        confidence = float(raw_decision.get("confidence", 0.0))
+        provided_digest = str(raw_decision.get("registry_digest", expected_digest))
+    else:
+        if not candidate_contracts or not q_tokens:
+            chosen_option = "none"
+            confidence = 1.0
+        elif any(sep in q_lower for sep in (" nastepnie ", " a potem ", " and then ", " then ")):
+            chosen_option = "need_multi_step"
+            confidence = 0.9
+        else:
+            decision_cands = [
+                DecisionCandidate(
+                    uri=str(c.get("uri", f"proc://taskand.dev/op/{idx}/v1")),
+                    dsl_command=str(c.get("dsl_command", c.get("action_id", f"op.exec_{idx}"))),
+                    description=str(c.get("description", "")),
+                    keywords=tuple(str(k) for k in c.get("keywords", ())),
+                    risk_level=int(c.get("risk_level", 1)),
+                    prior_boost=float(c.get("prior_boost", 0.0)),
+                )
+                for idx, c in enumerate(candidate_contracts[:252])
+            ]
+            logits = [_score_candidate(q_tokens, q_lower, dc) for dc in decision_cands]
+            max_logit = max(logits)
+            if max_logit <= -1.0:
+                chosen_option = "none"
+                confidence = 0.85
+            else:
+                probs = _softmax(logits)
+                sorted_probs = sorted(probs, reverse=True)
+                best_idx = max(range(len(probs)), key=lambda i: probs[i])
+                if len(sorted_probs) > 1 and (sorted_probs[0] - sorted_probs[1]) < 0.05:
+                    chosen_option = "need_clarification"
+                    confidence = sorted_probs[0]
+                else:
+                    chosen_option = f"op_{best_idx}"
+                    confidence = probs[best_idx]
+        provided_digest = expected_digest
+
+    selected_contract = bindings.get(chosen_option)
+    allowed_uris = set(ctx.get("allowed_uris", [c.get("uri") for c in candidate_contracts if c.get("uri")]))
+    approved_high_risk = bool(ctx.get("approved_high_risk", False))
+
+    # 6 deterministic safety gates
+    gate_1_membership = chosen_option in options and (
+        chosen_option in SPECIAL_OUTCOMES or chosen_option in bindings
+    )
+    gate_2_digest = provided_digest == expected_digest
+    gate_3_schema = True
+    gate_4_acl = True
+    gate_5_approval = True
+    gate_6_effect = True
+
+    if selected_contract is not None:
+        required_args = tuple(selected_contract.get("required_args", ()))
+        bound_args = dict(selected_contract.get("arguments", ctx.get("arguments", {})))
+        gate_3_schema = all(arg in bound_args and bound_args[arg] not in (None, "") for arg in required_args)
+        uri_val = str(selected_contract.get("uri", ""))
+        gate_4_acl = bool(uri_val) and (not allowed_uris or uri_val in allowed_uris)
+        risk_level = int(selected_contract.get("risk_level", 1))
+        requires_approval = bool(selected_contract.get("requires_approval", risk_level >= 3))
+        gate_5_approval = (not requires_approval) or approved_high_risk
+        gate_6_effect = bool(selected_contract.get("effect_verifiable", True))
+
+    gates = {
+        "gate_1_candidate_membership": gate_1_membership,
+        "gate_2_registry_digest": gate_2_digest,
+        "gate_3_argument_schema": gate_3_schema,
+        "gate_4_resource_acl": gate_4_acl,
+        "gate_5_approval_policy": gate_5_approval,
+        "gate_6_effect_verification": gate_6_effect,
+    }
+    all_gates_passed = all(gates.values()) and chosen_option not in SPECIAL_OUTCOMES and selected_contract is not None
+
+    return {
+        "chosen_option": chosen_option if gate_1_membership else "none",
+        "selected_contract": selected_contract if all_gates_passed else None,
+        "selected_uri": selected_contract.get("uri") if (selected_contract and all_gates_passed) else None,
+        "confidence": round(confidence, 6),
+        "registry_digest": expected_digest,
+        "gates": gates,
+        "execution_authorized": all_gates_passed,
+    }

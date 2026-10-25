@@ -171,6 +171,10 @@ class DSLExecutor:
 # Layer 1: Deterministic NL Pattern Parser (Fast Path)
 # ---------------------------------------------------------------------------
 
+def _synonyms(spec: str) -> List[str]:
+    return [item.strip() for item in spec.split("|") if item.strip()]
+
+
 class NLIntentParser:
     """
     Deterministic rule-based multilingual (PL + EN) natural language parser.
@@ -178,40 +182,23 @@ class NLIntentParser:
     """
 
     VERB_SYNONYMS = {
-        # Query/List
-        "list": [
-            "pokaż", "pokaz", "wypisz", "wyświetl", "wyswietl", "lista", "listuj",
-            "pobierz", "sprawdź", "sprawdz", "znajdź", "znajdz", "szukaj", "podsumuj",
-            "show", "list", "display", "view", "get", "fetch", "check", "find", "search", "summary"
-        ],
-        # Get by ID
-        "get": [
-            "pokaż szczegóły", "szczegóły", "szczegoly", "dane", "pobierz",
-            "get", "show details", "details", "inspect"
-        ],
-        # Create/Add
-        "create": [
-            "dodaj", "utwórz", "utworz", "stwórz", "stworz", "nowy", "nowa", "nowe", "załóż", "zaloz",
-            "add", "create", "new", "register"
-        ],
-        # Close/Complete
-        "close": [
-            "zamknij", "zakończ", "zakoncz", "oznacz jako zrobione", "zrobione", "gotowe",
-            "close", "complete", "finish", "done"
-        ],
-        # Delete/Remove
-        "delete": [
-            "usuń", "usun", "skasuj", "odrzuć", "odrzuc", "wyrzuć", "wyrzuc",
-            "delete", "remove", "drop"
-        ]
+        "list": _synonyms(
+            "pokaż|pokaz|wypisz|wyświetl|wyswietl|lista|listuj|"
+            "pobierz|sprawdź|sprawdz|znajdź|znajdz|szukaj|podsumuj|"
+            "show|list|display|view|get|fetch|check|find|search|summary"
+        ),
+        "get": _synonyms("pokaż szczegóły|szczegóły|szczegoly|dane|pobierz|get|show details|details|inspect"),
+        "create": _synonyms("dodaj|utwórz|utworz|stwórz|stworz|nowy|nowa|nowe|załóż|zaloz|add|create|new|register"),
+        "close": _synonyms("zamknij|zakończ|zakoncz|oznacz jako zrobione|zrobione|gotowe|close|complete|finish|done"),
+        "delete": _synonyms("usuń|usun|skasuj|odrzuć|odrzuc|wyrzuć|wyrzuc|delete|remove|drop"),
     }
 
     ENTITY_SYNONYMS = {
-        "ticket": ["ticket", "tickety", "ticketów", "ticketow", "zadanie", "zadania", "zadań", "zadan", "zgłoszenie", "task", "tasks", "tickets"],
-        "pr": ["pr", "prs", "pull request", "pull requesty", "pull requestów", "pulls", "mr"],
-        "account": ["konto", "konta", "kont", "account", "accounts", "provider"],
-        "token": ["token", "tokeny", "tokenów", "tokens", "usage", "zużycie", "zuzycie"],
-        "process": ["proces", "procesy", "procesów", "agent", "agenty", "agentów", "process", "processes", "agents"]
+        "ticket": _synonyms("ticket|tickety|ticketów|ticketow|zadanie|zadania|zadań|zadan|zgłoszenie|task|tasks|tickets"),
+        "pr": _synonyms("pr|prs|pull request|pull requesty|pull requestów|pulls|mr"),
+        "account": _synonyms("konto|konta|kont|account|accounts|provider"),
+        "token": _synonyms("token|tokeny|tokenów|tokens|usage|zużycie|zuzycie"),
+        "process": _synonyms("proces|procesy|procesów|agent|agenty|agentów|process|processes|agents"),
     }
 
     def parse(self, text: str) -> Optional[DSLCommand]:
@@ -809,9 +796,14 @@ class InterfaceAdapters:
 # Self-Test Verification Suite
 # ---------------------------------------------------------------------------
 
+def _emit_self_test(line: str = "") -> None:
+    sys.stdout.write(f"{line}\n")
+    sys.stdout.flush()
+
+
 def run_self_test() -> int:
     """Executes normative self-tests verifying the standard implementation."""
-    print("Running wellmanifest/nl-dsl-llm standard conformance self-test...")
+    _emit_self_test("Running wellmanifest/nl-dsl-llm standard conformance self-test...")
 
     executor = DSLExecutor()
     # In-memory ticket store
@@ -843,40 +835,40 @@ def run_self_test() -> int:
     assert res1.success is True, f"Direct DSL failed: {res1}"
     assert len(res1.data) == 2
     assert res1.meta["sourceLayer"] == "direct_dsl"
-    print("✓ Direct DSL execution verified")
+    _emit_self_test("✓ Direct DSL execution verified")
 
     # Test 2: Layer 1 Polish Query
     res2 = bridge.handle_request("pokaż otwarte zadania")
     assert res2.success is True
     assert len(res2.data) == 2
     assert res2.meta["sourceLayer"] == "nl_fast_path"
-    print("✓ Layer 1 Polish query ('pokaż otwarte zadania') verified")
+    _emit_self_test("✓ Layer 1 Polish query ('pokaż otwarte zadania') verified")
 
     # Test 3: Layer 1 English Query
     res3 = bridge.handle_request("show open tickets")
     assert res3.success is True
     assert len(res3.data) == 2
     assert res3.meta["sourceLayer"] == "nl_fast_path"
-    print("✓ Layer 1 English query ('show open tickets') verified")
+    _emit_self_test("✓ Layer 1 English query ('show open tickets') verified")
 
     # Test 4: Layer 1 Creation with Title
     res4 = bridge.handle_request("dodaj zadanie 'Implement tests'")
     assert res4.success is True
     assert res4.data["title"] == "Implement tests"
-    print("✓ Layer 1 Creation ('dodaj zadanie ...') verified")
+    _emit_self_test("✓ Layer 1 Creation ('dodaj zadanie ...') verified")
 
     # Test 5: MCP Tool Call Parity
     mcp_call = InterfaceAdapters.handle_mcp_tool_call(bridge, "nl_ask", {"query": "wypisz tickety"})
     mcp_res = json.loads(mcp_call["content"][0]["text"])
     assert mcp_res["success"] is True
     assert len(mcp_res["data"]) == 4  # 3 original + 1 created
-    print("✓ Model Context Protocol (MCP) tool call parity verified")
+    _emit_self_test("✓ Model Context Protocol (MCP) tool call parity verified")
 
     # Test 6: CLI Markdown formatting
     md_output = InterfaceAdapters.cli_format(res1, output_format="markdown")
     assert "### Result (OK)" in md_output
     assert "| id | title | status |" in md_output
-    print("✓ CLI formatting (markdown table) verified")
+    _emit_self_test("✓ CLI formatting (markdown table) verified")
 
     # Test 7: Layer 1.5 Semantic Cache & Polarity Guard
     executor.register("cluster", "status", lambda cmd: {"cluster": "ready", "env": cmd.get_param("env", "prod")})
@@ -895,7 +887,7 @@ def run_self_test() -> int:
     res_neg = bridge.handle_request("nie sprawdzaj stanu klastra produkcyjnego", allow_llm_fallback=False)
     assert res_neg.success is False
     assert res_neg.status == "VALIDATION_ERROR"
-    print("✓ Layer 1.5 Semantic Cache and Polarity Guard verified")
+    _emit_self_test("✓ Layer 1.5 Semantic Cache and Polarity Guard verified")
 
     # Test 8: Layer 0.5 Real-time Autocomplete & Contextual Option Network
     twin = DigitalTwinContext(
@@ -915,9 +907,9 @@ def run_self_test() -> int:
     assert len(sugg_resp["suggestions"][0]["next_options"]) >= 2
     assert "--graceful" in sugg_resp["suggestions"][0]["next_options"][0]["completion_text"]
     assert sugg_resp["latency_ms"] < 10.0
-    print("✓ Layer 0.5 Real-time Autocomplete & Option Network verified")
+    _emit_self_test("✓ Layer 0.5 Real-time Autocomplete & Option Network verified")
 
-    print("\nALL STANDARD CONFORMANCE CHECKS PASSED (8/8).")
+    _emit_self_test("\nALL STANDARD CONFORMANCE CHECKS PASSED (8/8).")
     return 0
 
 

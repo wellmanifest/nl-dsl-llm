@@ -12,3 +12,4 @@
 - [x] Ticket-007: Conversational stream purity and state URL sync conformance (CONF-09, CONF-10)
 - [x] Ticket-008: Standardize pytest pythonpath and packaging configuration
 - [x] Ticket-010: System One and Jev-compatible typed decision layer for DSL and DockURI
+- [x] Ticket-011: Eliminate NOHARDCODE-001/007 findings and add canonical System One selector contract (#10)

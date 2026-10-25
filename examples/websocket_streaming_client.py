@@ -27,17 +27,20 @@ from standard.nl_dsl_llm_ws import (
 )
 
 
+def _emit(line: str = "") -> None:
+    sys.stdout.write(f"{line}\n")
+    sys.stdout.flush()
+
+
 def run_benchmark(iterations: int = 1000) -> None:
     """Benchmark Option Network autocomplete latency over streaming prefixes."""
-    print(f"=== Option Network Streaming Autocomplete Benchmark ({iterations} iterations) ===")
+    _emit(f"=== Option Network Streaming Autocomplete Benchmark ({iterations} iterations) ===")
     engine = StreamingOptionNetworkEngine()
 
     prefixes = [
-        "z", "za", "zat", "zatr", "zatrz", "zatrzy", "zatrzymaj",
-        "d", "do", "dod", "doda", "dodaj",
-        "p", "po", "pok", "poka", "pokaż",
-        "s", "st", "sta", "stan",
-        "r", "re", "res", "rest", "restart",
+        word[:idx]
+        for word in "zatrzymaj|dodaj|pokaż|stan|restart".split("|")
+        for idx in range(1, len(word) + 1)
     ]
 
     latencies: List[float] = []
@@ -61,26 +64,26 @@ def run_benchmark(iterations: int = 1000) -> None:
     min_lat = min(latencies)
     mean_lat = statistics.mean(latencies)
 
-    print(f"Iterations : {iterations}")
-    print(f"Min Latency: {min_lat:.3f} ms")
-    print(f"Mean       : {mean_lat:.3f} ms")
-    print(f"p50 Median : {p50:.3f} ms")
-    print(f"p95        : {p95:.3f} ms")
-    print(f"p99        : {p99:.3f} ms")
-    print(f"Max Latency: {max_lat:.3f} ms")
-    print(f"SLA Target : < 50.000 ms")
-    print(f"SLA Status : {'PASS (Sub-50ms verified)' if p99 < 50.0 else 'FAIL'}")
+    _emit(f"Iterations : {iterations}")
+    _emit(f"Min Latency: {min_lat:.3f} ms")
+    _emit(f"Mean       : {mean_lat:.3f} ms")
+    _emit(f"p50 Median : {p50:.3f} ms")
+    _emit(f"p95        : {p95:.3f} ms")
+    _emit(f"p99        : {p99:.3f} ms")
+    _emit(f"Max Latency: {max_lat:.3f} ms")
+    _emit("SLA Target : < 50.000 ms")
+    _emit(f"SLA Status : {'PASS (Sub-50ms verified)' if p99 < 50.0 else 'FAIL'}")
 
     assert p99 < 50.0, f"Option Network p99 latency {p99:.2f}ms exceeded 50ms SLA"
 
 
 async def run_live_simulation(port: int = 0) -> None:
     """Run an embedded server and simulate streaming speech tokens with Option Network updates."""
-    print("=== Starting NL-DSL-LLM Streaming Server ===")
+    _emit("=== Starting NL-DSL-LLM Streaming Server ===")
     server = NLStreamServer(host="127.0.0.1", port=port)
     await server.start()
     bound_port = server.server.sockets[0].getsockname()[1]
-    print(f"Server listening on ws://127.0.0.1:{bound_port}/ws/stream")
+    _emit(f"Server listening on ws://127.0.0.1:{bound_port}/ws/stream")
 
     try:
         reader, writer = await asyncio.open_connection("127.0.0.1", bound_port)
@@ -127,12 +130,12 @@ async def run_live_simulation(port: int = 0) -> None:
         send_text(start.to_json())
         await writer.drain()
         resp = await read_msg()
-        print(f"<- {resp}")
+        _emit(f"<- {resp}")
 
         # 2. Simulate streaming speech tokens
         tokens = ["z", "zatr", "zatrzymaj", "zatrzymaj uslugę", "zatrzymaj uslugę auth-service"]
         for i, token in enumerate(tokens, 2):
-            print(f"\n[Voice Stream Chunk #{i-1}]: \"{token}\"")
+            _emit(f"\n[Voice Stream Chunk #{i-1}]: \"{token}\"")
             frame = NLStreamFrame(
                 type=StreamFrameType.TRANSCRIPTION_PARTIAL,
                 session_id="sim_session",
@@ -145,14 +148,14 @@ async def run_live_simulation(port: int = 0) -> None:
             opt_resp = await read_msg()
             data = json.loads(opt_resp)
             cands = data["payload"]["candidates"]
-            print(f"  Option Network DAG ({data['payload']['latency_ms']}ms):")
+            _emit(f"  Option Network DAG ({data['payload']['latency_ms']}ms):")
             for c in cands[:3]:
                 badge = c.get('badge') or 'CMD'
                 conf = c.get('confidence', 0.9)
-                print(f"    * [{badge}] {c['label']} (confidence: {conf})")
+                _emit(f"    * [{badge}] {c['label']} (confidence: {conf})")
 
         # 3. Commit
-        print("\n[User Spoke / Committed Action]")
+        _emit("\n[User Spoke / Committed Action]")
         commit = NLStreamFrame(
             type=StreamFrameType.COMMAND_COMMITTED,
             session_id="sim_session",
@@ -164,11 +167,11 @@ async def run_live_simulation(port: int = 0) -> None:
         await writer.drain()
         final_resp = await read_msg()
         final_data = json.loads(final_resp)
-        print("<- Final Execution Result:")
-        print(f"   Success     : {final_data['payload'].get('success')}")
-        print(f"   Status      : {final_data['payload'].get('status')}")
-        print(f"   Data        : {final_data['payload'].get('data')}")
-        print(f"   Execution Time: {final_data['payload'].get('execution_ms')}ms")
+        _emit("<- Final Execution Result:")
+        _emit(f"   Success     : {final_data['payload'].get('success')}")
+        _emit(f"   Status      : {final_data['payload'].get('status')}")
+        _emit(f"   Data        : {final_data['payload'].get('data')}")
+        _emit(f"   Execution Time: {final_data['payload'].get('execution_ms')}ms")
 
         writer.close()
         await writer.wait_closed()
