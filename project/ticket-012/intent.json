@@ -1,0 +1,92 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-012",
+  "summary": "Release wellmanifest-nl-dsl-llm 0.1.1 and configure hatch wheel target",
+  "workstream": "integration",
+  "classification": {
+    "kind": "SERVICE",
+    "priority": "P2",
+    "origin": "requested"
+  },
+  "allowedPaths": [
+    "project/ticket-012/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "VERSION",
+    "pyproject.toml"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "a39cf2c01419bb2745e8370c8617f212f5b1f77a",
+    "targetBranch": "main",
+    "outcome": "Release wellmanifest-nl-dsl-llm 0.1.1 and configure hatch build wheel target for src/nl_dsl_llm.",
+    "nonGoals": [
+      "No external network calls during unit tests",
+      "No new mandatory runtime dependencies"
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 15,
+    "budgets": {
+      "maxImplementationFiles": 4,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Bump VERSION and pyproject.toml to 0.1.1 and configure hatch wheel packages target for src/nl_dsl_llm.",
+      "components": [
+        {
+          "name": "nl-dsl-llm-packaging",
+          "paths": [
+            "VERSION",
+            "pyproject.toml",
+            "project/ticket-012/intent.json",
+            "project/ticket-012/README.md",
+            "TODO.md",
+            "project/TICKETS.md"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-012 merge commit."
+    },
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider"
+        ],
+        "evidence": "project/ticket-012/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "project/ticket-012/README.md"
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "python3 .governance/standard_pack_check.py --root ."
+        ],
+        "evidence": "project/ticket-012/README.md"
+      }
+    ],
+    "runtimeDependencies": []
+  }
+}

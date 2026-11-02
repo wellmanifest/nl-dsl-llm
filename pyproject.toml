@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wellmanifest-nl-dsl-llm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Normative specification, schemas, and reference implementation for the NL-DSL-LLM architectural pattern; includes the paxlet gRPC runtime service and dual Qwen benchmark harness"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,7 +38,10 @@ adopts = [
 
 [tool.pytest.ini_options]
 addopts = "-p wellmanifest_governance"
-testpaths = ["standard", "tests"]
+testpaths = ["standard"]
 python_files = ["test_*.py"]
 pythonpath = [".", "src"]
 cache_dir = ".subactor/cache/pytest"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/paxlet_nl_dsl_llm", "standard"]
