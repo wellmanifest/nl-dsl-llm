@@ -6,17 +6,21 @@ set -euo pipefail
 MODEL_DIR="${MODEL_DIR:-/opt/models}"
 CACHE_DIR="${CACHE_DIR:-/opt/cache}"
 PROFILE="${1:-qwen3-1.7b}"
+HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8081}"
+OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+LLAMA_API_BASE="${LLAMA_API_BASE:-http://${HOST}:${PORT}/v1}"
+OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://${HOST}:${OLLAMA_PORT}}"
 THREADS="${THREADS:-4}"
 
 # Emit LiteLLM configuration if requested
 if [[ "${1:-}" == "--litellm-config" ]]; then
-  cat <<'EOF'
+  cat <<EOF
 model_list:
   - model_name: nl-router
     litellm_params:
       model: openai/qwen3-1.7b-instruct
-      api_base: http://127.0.0.1:8081/v1
+      api_base: ${LLAMA_API_BASE}
       api_key: none
       temperature: 0.2
       max_tokens: 128
@@ -24,7 +28,7 @@ model_list:
   - model_name: nl-quality
     litellm_params:
       model: openai/qwen3.5-2b-instruct
-      api_base: http://127.0.0.1:8081/v1
+      api_base: ${LLAMA_API_BASE}
       api_key: none
       temperature: 0.2
       max_tokens: 160
@@ -32,7 +36,7 @@ model_list:
   - model_name: nl-ollama
     litellm_params:
       model: ollama/qwen2.5:1.5b
-      api_base: http://127.0.0.1:11434
+      api_base: ${OLLAMA_API_BASE}
       timeout: 10
 router_settings:
   timeout: 15
@@ -106,13 +110,13 @@ if [[ ! -f "$MODEL_FILE" ]]; then
   echo "Warning: Model weights not found at $MODEL_FILE."
   echo "To download, run:"
   echo "  huggingface-cli download <repo> <filename> --local-dir $MODEL_DIR"
-  echo "Or verify local Ollama / LiteLLM gateway on http://127.0.0.1:11434"
+  echo "Or verify local Ollama / LiteLLM gateway on ${OLLAMA_API_BASE}"
   exit 0
 fi
 
 exec llama-server \
   --model "$MODEL_FILE" \
-  --host 127.0.0.1 --port "$PORT" \
+  --host "$HOST" --port "$PORT" \
   --threads "$THREADS" \
   --ctx-size "$CTX" \
   --n-predict "$PREDICT" \

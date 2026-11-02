@@ -1,0 +1,96 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-013",
+  "summary": "Externalize NL intent lexicon into semantic-profile.json and remove pipe-string hardcodes",
+  "workstream": "integration",
+  "classification": {
+    "kind": "BUG",
+    "priority": "P2",
+    "origin": "regression"
+  },
+  "allowedPaths": [
+    "project/ticket-013/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "standard/semantic-profile.json",
+    "standard/nl_dsl_llm.py",
+    "src/paxlet_nl_dsl_llm/layers.py",
+    "src/paxlet_nl_dsl_llm/server.py",
+    "scripts/run_llama_servers.sh"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [
+    "python"
+  ],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "f887b3c3e7d6b537313a8c7176fcee54b74718ce",
+    "targetBranch": "main",
+    "outcome": "Externalize NL intent lexicons and fast-path patterns into standard/semantic-profile.json and eliminate all NOHARDCODE-001/006/007 findings across standard/, src/, and scripts/.",
+    "nonGoals": [
+      "No external network calls during unit tests",
+      "No new mandatory runtime dependencies"
+    ],
+    "complexity": "M",
+    "estimatedMinutes": 45,
+    "budgets": {
+      "maxImplementationFiles": 6,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 1,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Load NL verb/entity/status synonyms and fast-path regex patterns from standard/semantic-profile.json, parameterize scripts/run_llama_servers.sh via environment variables, and replace raw print() calls in CLI entrypoints with sys.stdout.write.",
+      "components": [
+        {
+          "name": "nl-dsl-llm-runtime",
+          "paths": [
+            "standard/semantic-profile.json",
+            "standard/nl_dsl_llm.py",
+            "src/paxlet_nl_dsl_llm/layers.py",
+            "src/paxlet_nl_dsl_llm/server.py",
+            "scripts/run_llama_servers.sh"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-013 merge commit."
+    },
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider"
+        ],
+        "evidence": "project/ticket-013/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "./project/governance-check.sh"
+        ],
+        "evidence": "project/ticket-013/README.md"
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "python3 .governance/standard_pack_check.py --root ."
+        ],
+        "evidence": "project/ticket-013/README.md"
+      }
+    ],
+    "runtimeDependencies": []
+  }
+}

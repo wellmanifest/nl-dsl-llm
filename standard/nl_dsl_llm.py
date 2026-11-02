@@ -17,6 +17,7 @@ import sys
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
@@ -171,8 +172,13 @@ class DSLExecutor:
 # Layer 1: Deterministic NL Pattern Parser (Fast Path)
 # ---------------------------------------------------------------------------
 
-def _synonyms(spec: str) -> List[str]:
-    return [item.strip() for item in spec.split("|") if item.strip()]
+def _load_intent_lexicon() -> Dict[str, Any]:
+    profile_path = Path(__file__).resolve().with_name("semantic-profile.json")
+    data = json.loads(profile_path.read_text(encoding="utf-8"))
+    return dict(data.get("intent_lexicon") or {})
+
+
+_INTENT_LEXICON = _load_intent_lexicon()
 
 
 class NLIntentParser:
@@ -181,25 +187,9 @@ class NLIntentParser:
     Zero latency (<1ms), zero external API cost.
     """
 
-    VERB_SYNONYMS = {
-        "list": _synonyms(
-            "pokaż|pokaz|wypisz|wyświetl|wyswietl|lista|listuj|"
-            "pobierz|sprawdź|sprawdz|znajdź|znajdz|szukaj|podsumuj|"
-            "show|list|display|view|get|fetch|check|find|search|summary"
-        ),
-        "get": _synonyms("pokaż szczegóły|szczegóły|szczegoly|dane|pobierz|get|show details|details|inspect"),
-        "create": _synonyms("dodaj|utwórz|utworz|stwórz|stworz|nowy|nowa|nowe|załóż|zaloz|add|create|new|register"),
-        "close": _synonyms("zamknij|zakończ|zakoncz|oznacz jako zrobione|zrobione|gotowe|close|complete|finish|done"),
-        "delete": _synonyms("usuń|usun|skasuj|odrzuć|odrzuc|wyrzuć|wyrzuc|delete|remove|drop"),
-    }
-
-    ENTITY_SYNONYMS = {
-        "ticket": _synonyms("ticket|tickety|ticketów|ticketow|zadanie|zadania|zadań|zadan|zgłoszenie|task|tasks|tickets"),
-        "pr": _synonyms("pr|prs|pull request|pull requesty|pull requestów|pulls|mr"),
-        "account": _synonyms("konto|konta|kont|account|accounts|provider"),
-        "token": _synonyms("token|tokeny|tokenów|tokens|usage|zużycie|zuzycie"),
-        "process": _synonyms("proces|procesy|procesów|agent|agenty|agentów|process|processes|agents"),
-    }
+    VERB_SYNONYMS: Dict[str, List[str]] = dict(_INTENT_LEXICON.get("verbs") or {})
+    ENTITY_SYNONYMS: Dict[str, List[str]] = dict(_INTENT_LEXICON.get("entities") or {})
+    STATUS_FILTERS: Dict[str, List[str]] = dict(_INTENT_LEXICON.get("status_filters") or {})
 
     def parse(self, text: str) -> Optional[DSLCommand]:
         clean = text.strip()
@@ -247,11 +237,11 @@ class NLIntentParser:
         arguments: Dict[str, Any] = {}
         filters: Dict[str, Any] = {}
 
-        # Status / Condition extraction (PL & EN)
-        if re.search(r"\b(niescalone|otwarte|niezamknięte|unmerged|open)\b", lower):
-            filters["status"] = "OPEN"
-        elif re.search(r"\b(scalone|zamknięte|zrobione|merged|closed|done)\b", lower):
-            filters["status"] = "CLOSED"
+        # Status / Condition extraction (PL & EN) from semantic-profile.json
+        for status_code, keywords in self.STATUS_FILTERS.items():
+            if any(re.search(rf"\b{re.escape(kw)}\b", lower) for kw in keywords):
+                filters["status"] = status_code
+                break
 
         # Extract numeric ID if present (e.g. ticket-001 or #123 or 45)
         id_match = re.search(r"(?:ticket-|#)?([0-9]{1,4})\b", lower)
