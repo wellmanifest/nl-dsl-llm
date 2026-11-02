@@ -71,113 +71,21 @@ def damerau_levenshtein(s1: str, s2: str) -> int:
 # Layer 1: Deterministic Multi-lingual Fast-Path
 # ==============================================================================
 
+def _load_fast_path_patterns() -> List[Tuple[re.Pattern, str, Dict[str, Any]]]:
+    from pathlib import Path
+    profile_path = Path(__file__).resolve().parents[2] / "standard" / "semantic-profile.json"
+    data = json.loads(profile_path.read_text(encoding="utf-8"))
+    entries = data.get("intent_lexicon", {}).get("fast_path_patterns", [])
+    return [
+        (re.compile(item["pattern"], re.I), item["intent"], dict(item.get("default_args", {})))
+        for item in entries
+    ]
+
+
 class FastPathParser:
     """Deterministic regex-based intent parser for standard commands (<1ms)."""
 
-    PATTERNS: List[Tuple[re.Pattern, str, Dict[str, Any]]] = [
-        # 1. CPU Monitor
-        (
-            re.compile(r"\b(status\s+cpu|pokaż\s+(procesor|cpu)|użycie\s+(procesora|cpu)|show\s+cpu|cpu\s+status|check\s+load)\b|^\s*(cpu|procesor|proc|obciążenie|obc|load)\s*$", re.I),
-            "monitor.cpu_status",
-            {}
-        ),
-        # 2. Memory Monitor
-        (
-            re.compile(r"\b(status\s+ram|pokaż\s+(pamięć|ram)|użycie\s+(ramu|ram|pamięci)|ram\s+status|show\s+memory|memory\s+usage)\b|^\s*(ram|pamięć|pam|pamięci|memory|mem)\s*$", re.I),
-            "monitor.memory_status",
-            {}
-        ),
-        # 3. Cache Cleanup
-        (
-            re.compile(r"\b(wyczyść\s+cache|usuń\s+pamięć\s+podręczną|clear\s+cache|clean\s+cache|purge\s+cache)\b|^\s*(cache|wyczyść|wycz|czysz|purge|flush)\s*$", re.I),
-            "cache.cleanup",
-            {}
-        ),
-        # 4. Service Restart (Exact single word / half-word or designated phrases; 'zrestartuj bazę' excluded to allow clarify)
-        (
-            re.compile(r"\b(zrestartuj\s+usługę|restart\s+service|zrestartuj\s+serwis)\b|^\s*(restart|res|zrestartuj|zre|reboot|reb|reset)\s*$", re.I),
-            "service.restart",
-            {"target": "default"}
-        ),
-        # 5. Task Schedule
-        (
-            re.compile(r"\b(zaplanuj\s+zadanie|schedule\s+task|plan\s+task)\b|^\s*(harmonogram|harm|zaplanuj|zap|schedule|sched|kolejkuj)\s*$", re.I),
-            "task.schedule",
-            {"title": "Routine health scan", "environment": "prod"}
-        ),
-        # 6. Task Get
-        (
-            re.compile(r"\b(szczegóły\s+zadania|pokaż\s+szczegóły|task\s+details|show\s+details)\b|^\s*(szczegóły|szcz|szczegoly|inspect|insp|dane)\s*$", re.I),
-            "task.get",
-            {"id": "task-001"}
-        ),
-        # 7. Task Create
-        (
-            re.compile(r"\b(utwórz\s+zadanie|dodaj\s+zadanie|nowe\s+zadanie|create\s+task|new\s+task)\b|^\s*(utwórz|utw|utworz|nowy|create|crea|dodaj)\s*$", re.I),
-            "task.create",
-            {"title": "New Task"}
-        ),
-        # 8. Task Close
-        (
-            re.compile(r"\b(zamknij\s+zadanie|zakończ\s+zadanie|close\s+task|complete\s+task)\b|^\s*(zakończ|zak|zakoncz|zamknij|zam|complete|comp|gotowe)\s*$", re.I),
-            "task.close",
-            {"id": "task-001"}
-        ),
-        # 9. Task List
-        (
-            re.compile(r"\b(pokaż\s+(otwarte\s+)?(zadania|tickety)|wypisz\s+(zadania|tickety)|list\s+(open\s+)?(tasks|tickets)|show\s+(tasks|tickets))\b|^\s*(zadania|zad|tickety|tick|tasks|tickets)\s*$", re.I),
-            "task.list",
-            {}
-        ),
-        # 10. Worktree Allocate
-        (
-            re.compile(r"\b(alokuj\s+worktree|allocate\s+worktree|nowe\s+worktree|create\s+worktree)\b|^\s*(worktree|work|alokuj|alo|gałąź|branch)\s*$", re.I),
-            "worktree.allocate",
-            {"ticket": "ticket-current"}
-        ),
-        # 11. Koru Doctor
-        (
-            re.compile(r"\b(koru\s+doctor|uruchom\s+doctora|sprawdź\s+błędy|doctor\s+diagnose)\b|^\s*(doctor|doc|napraw|nap|diagnostyka|diag|diagnoza)\s*$", re.I),
-            "koru.doctor",
-            {}
-        ),
-        # 12. Koru Queue Next
-        (
-            re.compile(r"\b(następne\s+zadanie|kolejne\s+zadanie|next\s+task|pop\s+queue)\b|^\s*(kolejka|kol|następne|nast|następny|next)\s*$", re.I),
-            "koru.queue.next",
-            {}
-        ),
-        # 13. Koru Queue Loop
-        (
-            re.compile(r"\b(pętla\s+zadań|task\s+loop|run\s+loop|queue\s+loop)\b|^\s*(pętla|pęt|pet|loop|automatyzacja|auto|ciągłość)\s*$", re.I),
-            "koru.queue.loop",
-            {}
-        ),
-        # 14. Koru Context
-        (
-            re.compile(r"\b(pokaż\s+kontekst|show\s+context|stan\s+projektu|session\s+context)\b|^\s*(kontekst|kon|brief|brie|context|stan)\s*$", re.I),
-            "koru.context",
-            {}
-        ),
-        # 15. Pull Request List
-        (
-            re.compile(r"\b(pokaż\s+pr|list\s+prs|open\s+prs|lista\s+pr)\b|^\s*(pr|prs|pulls|pul)\s*$", re.I),
-            "pr.list",
-            {}
-        ),
-        # 16. Token List
-        (
-            re.compile(r"\b(zużycie\s+tokenów|token\s+usage|stan\s+tokenów)\b|^\s*(token|tok|tokeny|zużycie|zuż|zuz)\s*$", re.I),
-            "token.list",
-            {}
-        ),
-        # 17. Process List
-        (
-            re.compile(r"\b(lista\s+procesów|list\s+processes|running\s+processes)\b|^\s*(procesy|proce|agenty|agen|processes)\s*$", re.I),
-            "process.list",
-            {}
-        ),
-    ]
+    PATTERNS: List[Tuple[re.Pattern, str, Dict[str, Any]]] = _load_fast_path_patterns()
 
     TYPO_CATALOG: Dict[str, Tuple[str, Dict[str, Any]]] = {
         "restart": ("service.restart", {"target": "default"}),

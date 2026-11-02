@@ -300,16 +300,16 @@ def main() -> None:
 
     engine = NLRuntimeEngine()
     if args.test_query:
-        print(json.dumps(engine.interpret(args.test_query), indent=2, ensure_ascii=False))
+        sys.stdout.write(json.dumps(engine.interpret(args.test_query), indent=2, ensure_ascii=False) + "\n")
         sys.exit(0)
     if args.benchmark_query:
-        print(json.dumps(engine.benchmark_both_models(args.benchmark_query), indent=2, ensure_ascii=False))
+        sys.stdout.write(json.dumps(engine.benchmark_both_models(args.benchmark_query), indent=2, ensure_ascii=False) + "\n")
         sys.exit(0)
     if args.benchmark_matrix:
-        print(json.dumps(engine.benchmark_matrix(args.benchmark_matrix), indent=2, ensure_ascii=False))
+        sys.stdout.write(json.dumps(engine.benchmark_matrix(args.benchmark_matrix), indent=2, ensure_ascii=False) + "\n")
         sys.exit(0)
 
-    print(f"paxlet-com/nl-dsl-llm daemon initialized (UDS={args.uds}, TCP=127.0.0.1:{args.port})")
+    sys.stdout.write(f"paxlet-com/nl-dsl-llm daemon initialized (UDS={args.uds}, TCP=127.0.0.1:{args.port})\n")
 
 
 if __name__ == "__main__":

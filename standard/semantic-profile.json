@@ -16,5 +16,60 @@
   ],
   "max_steps": 16,
   "compilation_executes": false,
-  "runtime_owner": "paxlet-com/dockuri"
+  "runtime_owner": "paxlet-com/dockuri",
+  "intent_lexicon": {
+    "verbs": {
+      "list": [
+        "pokaż", "pokaz", "wypisz", "wyświetl", "wyswietl", "lista", "listuj",
+        "pobierz", "sprawdź", "sprawdz", "znajdź", "znajdz", "szukaj", "podsumuj",
+        "show", "list", "display", "view", "get", "fetch", "check", "find", "search", "summary"
+      ],
+      "get": [
+        "pokaż szczegóły", "szczegóły", "szczegoly", "dane", "pobierz",
+        "get", "show details", "details", "inspect"
+      ],
+      "create": [
+        "dodaj", "utwórz", "utworz", "stwórz", "stworz", "nowy", "nowa", "nowe", "załóż", "zaloz",
+        "add", "create", "new", "register"
+      ],
+      "close": [
+        "zamknij", "zakończ", "zakoncz", "oznacz jako zrobione", "zrobione", "gotowe",
+        "close", "complete", "finish", "done"
+      ],
+      "delete": [
+        "usuń", "usun", "skasuj", "odrzuć", "odrzuc", "wyrzuć", "wyrzuc",
+        "delete", "remove", "drop"
+      ]
+    },
+    "entities": {
+      "ticket": ["ticket", "tickety", "ticketów", "ticketow", "zadanie", "zadania", "zadań", "zadan", "zgłoszenie", "task", "tasks", "tickets"],
+      "pr": ["pr", "prs", "pull request", "pull requesty", "pull requestów", "pulls", "mr"],
+      "account": ["konto", "konta", "kont", "account", "accounts", "provider"],
+      "token": ["token", "tokeny", "tokenów", "tokens", "usage", "zużycie", "zuzycie"],
+      "process": ["proces", "procesy", "procesów", "agent", "agenty", "agentów", "process", "processes", "agents"]
+    },
+    "status_filters": {
+      "OPEN": ["niescalone", "otwarte", "niezamknięte", "unmerged", "open"],
+      "CLOSED": ["scalone", "zamknięte", "zrobione", "merged", "closed", "done"]
+    },
+    "fast_path_patterns": [
+      {"pattern": "\\b(status\\s+cpu|pokaż\\s+(procesor|cpu)|użycie\\s+(procesora|cpu)|show\\s+cpu|cpu\\s+status|check\\s+load)\\b|^\\s*(cpu|procesor|proc|obciążenie|obc|load)\\s*$", "intent": "monitor.cpu_status", "default_args": {}},
+      {"pattern": "\\b(status\\s+ram|pokaż\\s+(pamięć|ram)|użycie\\s+(ramu|ram|pamięci)|ram\\s+status|show\\s+memory|memory\\s+usage)\\b|^\\s*(ram|pamięć|pam|pamięci|memory|mem)\\s*$", "intent": "monitor.memory_status", "default_args": {}},
+      {"pattern": "\\b(wyczyść\\s+cache|usuń\\s+pamięć\\s+podręczną|clear\\s+cache|clean\\s+cache|purge\\s+cache)\\b|^\\s*(cache|wyczyść|wycz|czysz|purge|flush)\\s*$", "intent": "cache.cleanup", "default_args": {}},
+      {"pattern": "\\b(zrestartuj\\s+usługę|restart\\s+service|zrestartuj\\s+serwis)\\b|^\\s*(restart|res|zrestartuj|zre|reboot|reb|reset)\\s*$", "intent": "service.restart", "default_args": {"target": "default"}},
+      {"pattern": "\\b(zaplanuj\\s+zadanie|schedule\\s+task|plan\\s+task)\\b|^\\s*(harmonogram|harm|zaplanuj|zap|schedule|sched|kolejkuj)\\s*$", "intent": "task.schedule", "default_args": {"title": "Routine health scan", "environment": "prod"}},
+      {"pattern": "\\b(szczegóły\\s+zadania|pokaż\\s+szczegóły|task\\s+details|show\\s+details)\\b|^\\s*(szczegóły|szcz|szczegoly|inspect|insp|dane)\\s*$", "intent": "task.get", "default_args": {"id": "task-001"}},
+      {"pattern": "\\b(utwórz\\s+zadanie|dodaj\\s+zadanie|nowe\\s+zadanie|create\\s+task|new\\s+task)\\b|^\\s*(utwórz|utw|utworz|nowy|create|crea|dodaj)\\s*$", "intent": "task.create", "default_args": {"title": "New Task"}},
+      {"pattern": "\\b(zamknij\\s+zadanie|zakończ\\s+zadanie|close\\s+task|complete\\s+task)\\b|^\\s*(zakończ|zak|zakoncz|zamknij|zam|complete|comp|gotowe)\\s*$", "intent": "task.close", "default_args": {"id": "task-001"}},
+      {"pattern": "\\b(pokaż\\s+(otwarte\\s+)?(zadania|tickety)|wypisz\\s+(zadania|tickety)|list\\s+(open\\s+)?(tasks|tickets)|show\\s+(tasks|tickets))\\b|^\\s*(zadania|zad|tickety|tick|tasks|tickets)\\s*$", "intent": "task.list", "default_args": {}},
+      {"pattern": "\\b(alokuj\\s+worktree|allocate\\s+worktree|nowe\\s+worktree|create\\s+worktree)\\b|^\\s*(worktree|work|alokuj|alo|gałąź|branch)\\s*$", "intent": "worktree.allocate", "default_args": {"ticket": "ticket-current"}},
+      {"pattern": "\\b(koru\\s+doctor|uruchom\\s+doctora|sprawdź\\s+błędy|doctor\\s+diagnose)\\b|^\\s*(doctor|doc|napraw|nap|diagnostyka|diag|diagnoza)\\s*$", "intent": "koru.doctor", "default_args": {}},
+      {"pattern": "\\b(następne\\s+zadanie|kolejne\\s+zadanie|next\\s+task|pop\\s+queue)\\b|^\\s*(kolejka|kol|następne|nast|następny|next)\\s*$", "intent": "koru.queue.next", "default_args": {}},
+      {"pattern": "\\b(pętla\\s+zadań|task\\s+loop|run\\s+loop|queue\\s+loop)\\b|^\\s*(pętla|pęt|pet|loop|automatyzacja|auto|ciągłość)\\s*$", "intent": "koru.queue.loop", "default_args": {}},
+      {"pattern": "\\b(pokaż\\s+kontekst|show\\s+context|stan\\s+projektu|session\\s+context)\\b|^\\s*(kontekst|kon|brief|brie|context|stan)\\s*$", "intent": "koru.context", "default_args": {}},
+      {"pattern": "\\b(pokaż\\s+pr|list\\s+prs|open\\s+prs|lista\\s+pr)\\b|^\\s*(pr|prs|pulls|pul)\\s*$", "intent": "pr.list", "default_args": {}},
+      {"pattern": "\\b(zużycie\\s+tokenów|token\\s+usage|stan\\s+tokenów)\\b|^\\s*(token|tok|tokeny|zużycie|zuż|zuz)\\s*$", "intent": "token.list", "default_args": {}},
+      {"pattern": "\\b(lista\\s+procesów|list\\s+processes|running\\s+processes)\\b|^\\s*(procesy|proce|agenty|agen|processes)\\s*$", "intent": "process.list", "default_args": {}}
+    ]
+  }
 }
