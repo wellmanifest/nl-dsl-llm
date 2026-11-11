@@ -1,0 +1,99 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-015",
+  "summary": "Harden RFC6455 WebSocket handshake/control frames, JSON depth/NaN bounds, and System One contract gates",
+  "workstream": "integration",
+  "classification": {
+    "kind": "BUG",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "project/ticket-015/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "standard/**"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [
+    "python"
+  ],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "8bb361daac28125e539923ce142fda8b002dfd78",
+    "targetBranch": "main",
+    "outcome": "Extract RFC 6455 WebSocket framing into standard/nl_dsl_ws_framing.py and System One schema/formatting helpers into standard/system_one_profiles.py so all modules stay well below 500 lines, while fixing non-ASCII WebSocket handshake crashes, control-frame/RSV/length invariants, JSON NaN/Infinity/depth bounds, and malformed contract/provider handling in select_operation.",
+    "nonGoals": [
+      "No breaking changes to valid WebSocket frames or System One decision envelopes",
+      "No new external runtime dependencies"
+    ],
+    "complexity": "M",
+    "estimatedMinutes": 45,
+    "budgets": {
+      "maxImplementationFiles": 6,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 0,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Factor RFC 6455 handshake, frame codecs, and strict JSON stream envelopes into standard/nl_dsl_ws_framing.py with re-exports in standard/nl_dsl_llm_ws.py, and factor bounded O_NOFOLLOW schema loading and DSL/URI formatting helpers into standard/system_one_profiles.py while hardening contract gates in standard/system_one_decision.py.",
+      "components": [
+        {
+          "name": "nl-dsl-websocket-streaming",
+          "paths": [
+            "standard/nl_dsl_ws_framing.py",
+            "standard/nl_dsl_llm_ws.py"
+          ]
+        },
+        {
+          "name": "system-one-decision-standard",
+          "paths": [
+            "standard/system_one_profiles.py",
+            "standard/system_one_decision.py",
+            "standard/test_hardening.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-015 merge commit."
+    },
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider"
+        ],
+        "evidence": "project/ticket-015/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "python3 standard/nl_dsl_llm.py --self-test",
+          "ruff check standard/nl_dsl_ws_framing.py standard/nl_dsl_llm_ws.py standard/system_one_profiles.py standard/system_one_decision.py standard/test_hardening.py"
+        ],
+        "evidence": "project/ticket-015/README.md"
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "./project/governance-check.sh --base origin/main",
+          "wellman check"
+        ],
+        "evidence": "project/ticket-015/README.md"
+      }
+    ],
+    "runtimeDependencies": []
+  }
+}

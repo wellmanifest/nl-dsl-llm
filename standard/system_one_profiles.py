@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import functools
+import json
 import math
+import os
 import re
-from collections.abc import Sequence
+import stat
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+from urllib.parse import quote
 
 SCHEMA_ID = "wellmanifest.system-one-decision/v1"
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "schemas" / "system-one-decision.schema.json"
@@ -272,3 +278,184 @@ def _softmax(logits: Sequence[float]) -> list[float]:
     diff = round(1.0 - sum(probs), 6)
     probs[0] = round(probs[0] + diff, 6)
     return probs
+
+
+@functools.lru_cache(maxsize=1)
+def _load_schema_keys() -> tuple[frozenset[str], frozenset[str]]:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(SCHEMA_PATH, flags)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size <= 0 or st.st_size > 1024 * 1024:
+            raise ValueError("Invalid system-one-decision schema file")
+        raw = os.read(fd, 1024 * 1024 + 1)
+    finally:
+        os.close(fd)
+    if len(raw) > 1024 * 1024:
+        raise ValueError("Oversized system-one-decision schema file")
+    schema_doc = json.loads(raw.decode("utf-8"))
+    return frozenset(schema_doc["required"]), frozenset(schema_doc["properties"].keys())
+
+
+def _is_finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _parse_contract_risk(raw: Any) -> tuple[int, bool]:
+    if raw is None:
+        return 1, True
+    if type(raw) is int and 1 <= raw <= 3:
+        return raw, True
+    return 3, False
+
+
+def _format_bound_dsl(action_id: str, bound_arguments: Mapping[str, Any]) -> str:
+    base = action_id if "." in action_id else f"{action_id}.execute"
+    if not bound_arguments:
+        return base
+    parts: list[str] = []
+    for key in sorted(bound_arguments):
+        raw_val = bound_arguments[key]
+        if isinstance(raw_val, (dict, list)):
+            formatted = json.dumps(
+                raw_val, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+            )
+        else:
+            text_val = str(raw_val)
+            needs_quote = not text_val or any(
+                ch.isspace() or ch in ('"', "'", "\\", "=") or ord(ch) < 32 or ord(ch) == 127
+                for ch in text_val
+            )
+            formatted = json.dumps(text_val, ensure_ascii=False) if needs_quote else text_val
+        parts.append(f"{key}={formatted}")
+    return f"{base} " + " ".join(parts)
+
+
+def _format_action_uri(uri_base: str, bound_arguments: Mapping[str, Any]) -> str:
+    if not bound_arguments or "?" in uri_base:
+        return uri_base
+    query = "&".join(
+        f"{quote(str(k), safe='._~-')}={quote(str(bound_arguments[k]), safe='._~-')}"
+        for k in sorted(bound_arguments)
+    )
+    return f"{uri_base}?{query}"
+
+
+def validate_system_one_decision_envelope(envelope: Mapping[str, Any]) -> None:
+    """Deterministic validator for wellmanifest.system-one-decision/v1 envelopes."""
+    invalid_env = not isinstance(envelope, Mapping)
+    if invalid_env:
+        raise ValueError("Envelope must be a mapping")
+    required_keys, allowed_keys = _load_schema_keys()
+    if any(not isinstance(k, str) for k in envelope):
+        raise ValueError("Envelope keys must be strings")
+    actual_keys = set(envelope.keys())
+
+    missing, extra = required_keys - actual_keys, actual_keys - allowed_keys
+    if missing or extra:
+        raise ValueError(
+            f"Invalid envelope keys: missing={sorted(missing)}, extra={sorted(extra)}"
+        )
+    if envelope.get("schema") != SCHEMA_ID:
+        raise ValueError(f"Invalid schema: {envelope.get('schema')}")
+    model_id = envelope.get("model_id")
+    if not isinstance(model_id, str) or model_id not in SYSTEM_ONE_PROFILES:
+        raise ValueError(f"Unsupported model_id: {model_id}")
+    expected_family = SYSTEM_ONE_PROFILES[model_id].family
+    if envelope.get("model_family") != expected_family:
+        raise ValueError(
+            f"model_family mismatch: {envelope.get('model_family')} != {expected_family}"
+        )
+
+    questions = envelope.get("questions")
+    if (
+        not isinstance(questions, list)
+        or len(questions) != 3
+        or not all(isinstance(q, Mapping) for q in questions)
+    ):
+        raise ValueError("questions must be a 3-element list of objects")
+    q_choice, q_score, q_noul = questions
+    if q_choice.get("name") != "uri_choice" or q_choice.get("type") != "choice":
+        raise ValueError("questions[0] must be uri_choice (choice)")
+    if (
+        q_score.get("name") != "risk_score"
+        or q_score.get("type") != "score"
+        or q_score.get("options") != ["1", "2", "3"]
+    ):
+        raise ValueError("questions[1] must be risk_score (score) with options ['1', '2', '3']")
+    if (
+        q_noul.get("name") != "execution_allowed"
+        or q_noul.get("type") != "noul"
+        or q_noul.get("options") != ["yes", "no"]
+    ):
+        raise ValueError(
+            "questions[2] must be execution_allowed (noul) with options ['yes', 'no']"
+        )
+
+    uri_options = q_choice.get("options")
+    if (
+        not isinstance(uri_options, list)
+        or not (1 <= len(uri_options) <= 255)
+        or not all(isinstance(u, str) for u in uri_options)
+        or len(set(uri_options)) != len(uri_options)
+    ):
+        raise ValueError("uri_choice options must be 1..255 unique Action URIs")
+    for uri in uri_options:
+        if not ACTION_URI_RE.fullmatch(uri):
+            raise ValueError(f"Invalid Action URI in options: {uri}")
+
+    answers = envelope.get("answers")
+    expected_q_names = {"uri_choice", "risk_score", "execution_allowed"}
+    if not isinstance(answers, Mapping) or set(answers.keys()) != expected_q_names:
+        raise ValueError("answers must contain exactly uri_choice, risk_score, execution_allowed")
+    if (
+        answers["uri_choice"] not in uri_options
+        or envelope.get("selected_uri") != answers["uri_choice"]
+    ):
+        raise ValueError("selected_uri and answers.uri_choice must match an option in questions[0]")
+    raw_risk = envelope.get("risk_score")
+    if (
+        answers["risk_score"] not in ("1", "2", "3")
+        or type(raw_risk) is not int
+        or raw_risk != int(answers["risk_score"])
+    ):
+        raise ValueError("risk_score must be an integer matching answers.risk_score in {1, 2, 3}")
+    raw_allowed = envelope.get("execution_allowed")
+    if (
+        answers["execution_allowed"] not in ("yes", "no")
+        or not isinstance(raw_allowed, bool)
+        or raw_allowed != (answers["execution_allowed"] == "yes")
+    ):
+        raise ValueError("execution_allowed boolean must match answers.execution_allowed")
+
+    confidence = envelope.get("confidence")
+    if not _is_finite_number(confidence) or not (0.0 <= float(confidence) <= 1.0):
+        raise ValueError(f"Invalid confidence: {confidence}")
+    latency_ms = envelope.get("latency_ms")
+    if not _is_finite_number(latency_ms) or float(latency_ms) < 0.0:
+        raise ValueError(f"Invalid latency_ms: {latency_ms}")
+
+    if "selected_dsl" in envelope and (
+        not isinstance(envelope["selected_dsl"], str)
+        or not CANONICAL_DSL_RE.fullmatch(envelope["selected_dsl"])
+    ):
+        raise ValueError(f"Invalid selected_dsl: {envelope['selected_dsl']}")
+
+    probs = envelope.get("probabilities")
+    if not isinstance(probs, Mapping) or set(probs.keys()) != expected_q_names:
+        raise ValueError("probabilities must contain uri_choice, risk_score, execution_allowed")
+    if not all(isinstance(probs[g], Mapping) for g in expected_q_names):
+        raise ValueError("probability groups must be mappings")
+    if set(probs["uri_choice"].keys()) != set(uri_options):
+        raise ValueError("probabilities.uri_choice keys must match questions[0].options")
+    if set(probs["risk_score"].keys()) != {"1", "2", "3"}:
+        raise ValueError("probabilities.risk_score keys must be {'1', '2', '3'}")
+    if set(probs["execution_allowed"].keys()) != {"yes", "no"}:
+        raise ValueError("probabilities.execution_allowed keys must be {'yes', 'no'}")
+
+    for group_name, dist in probs.items():
+        vals = list(dist.values())
+        if any(not _is_finite_number(v) or float(v) < 0.0 or float(v) > 1.0 for v in vals):
+            raise ValueError(f"Invalid probability value in {group_name}")
+        if abs(sum(float(v) for v in vals) - 1.0) > 1e-4:
+            raise ValueError(f"Probabilities in {group_name} must sum to 1.0")

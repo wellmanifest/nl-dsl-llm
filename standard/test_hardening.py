@@ -196,3 +196,116 @@ def test_websocket_bounds_malformed_frames_and_unique_sessions() -> None:
             await server.stop()
 
     asyncio.run(_exercise_server())
+
+
+def test_rfc6455_handshake_control_frames_and_json_depth_nan_hardening() -> None:
+    from standard.nl_dsl_llm_ws import make_ws_handshake_response
+
+    # 1. Invalid / non-ASCII Sec-WebSocket-Key raises ValueError instead of UnicodeEncodeError
+    for bad_key in ("short", "not-base64-key-at-all!!!", "żółć" * 6, "QUFBQUFBQUFBQUFBQUFBQ==="):
+        with pytest.raises(ValueError):
+            make_ws_handshake_response(bad_key)
+
+    # 2. Control frame > 125 bytes, fragmented control frame, RSV bits, non-minimal lengths rejected
+    with pytest.raises(ValueError, match="125"):
+        encode_ws_frame(b"x" * 126, opcode=9)
+    with pytest.raises(ValueError, match="125"):
+        decode_ws_frame(bytearray([0x89, 126, 0x00, 126]) + (b"x" * 126))
+    with pytest.raises(ValueError, match="fragmented"):
+        decode_ws_frame(bytearray([0x09, 0x00]))
+    with pytest.raises(ValueError, match="RSV"):
+        decode_ws_frame(bytearray([0x91, 0x00]))
+    with pytest.raises(ValueError, match="Non-minimal"):
+        decode_ws_frame(bytearray([0x81, 126, 0x00, 10]) + (b"a" * 10))
+
+    # 3. NLStreamFrame rejects NaN/Infinity and >64 JSON nesting
+    with pytest.raises(ValueError):
+        NLStreamFrame.from_json('{"type": "STREAM_START", "payload": {"x": NaN}}')
+    deep = '{"type": "STREAM_START", "payload": ' + ('{"a": ' * 70) + "1" + ("}" * 70) + "}"
+    with pytest.raises(ValueError):
+        NLStreamFrame.from_json(deep)
+    bad_out = NLStreamFrame(
+        type=StreamFrameType.STREAM_START,
+        session_id="s1",
+        sequence=1,
+        timestamp_ms=1.0,
+        payload={"bad": float("nan")},
+    )
+    with pytest.raises(ValueError):
+        bad_out.to_json()
+
+    # 4. Non-ASCII Sec-WebSocket-Key over TCP returns HTTP 400 cleanly
+    async def _bad_upgrade() -> None:
+        server = NLStreamServer(host="127.0.0.1", port=0)
+        await server.start()
+        assert server.server is not None
+        port = server.server.sockets[0].getsockname()[1]
+        try:
+            r_bad, w_bad = await asyncio.open_connection("127.0.0.1", port)
+            w_bad.write(
+                b"GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+                b"Upgrade: websocket\r\nConnection: Upgrade\r\n"
+                b"Sec-WebSocket-Key: \xff\xfe\xfd\r\n\r\n"
+            )
+            await w_bad.drain()
+            resp = await r_bad.read(256)
+            assert b"400 Bad Request" in resp
+            w_bad.close()
+            await w_bad.wait_closed()
+        finally:
+            await server.stop()
+
+    asyncio.run(_bad_upgrade())
+
+
+def test_select_operation_malformed_contract_fields_and_252_digest_parity() -> None:
+    from standard.system_one_decision import build_selection_question
+
+    # Boolean risk_level and non-mapping arguments fail gate_3_argument_schema cleanly without crash
+    malformed_contracts = [
+        {
+            "uri": "proc://taskand.dev/service/status/v1?target=db",
+            "dsl_command": "service.status target=db",
+            "description": "db status",
+            "keywords": ["status", "db"],
+            "risk_level": True,
+            "arguments": ["not-a-dict"],
+        }
+    ]
+    res = select_operation("status db", malformed_contracts)
+    assert res["gates"]["gate_3_argument_schema"] is False
+    assert res["execution_authorized"] is False
+
+    # Non-string chosen_option / registry_digest from provider fail closed
+    res_provider = select_operation(
+        "status db",
+        [
+            {
+                "uri": "proc://taskand.dev/service/status/v1?target=db",
+                "dsl_command": "service.status target=db",
+                "risk_level": 1,
+            }
+        ],
+        decision_provider=lambda _q: {
+            "chosen_option": None,
+            "confidence": 0.9,
+            "registry_digest": 12345,
+        },
+    )
+    assert res_provider["gates"]["gate_1_candidate_membership"] is False
+    assert res_provider["gates"]["gate_2_registry_digest"] is False
+    assert res_provider["execution_authorized"] is False
+
+    # 252-contract cap has exact digest parity with sliced bindings
+    many = [
+        {
+            "uri": f"proc://taskand.dev/op/run/v1?i={i}",
+            "dsl_command": f"op.run i={i}",
+            "risk_level": 1,
+        }
+        for i in range(260)
+    ]
+    q_260 = build_selection_question("run", many)
+    q_252 = build_selection_question("run", many[:252])
+    assert q_260["registry_digest"] == q_252["registry_digest"]
+    assert len(q_260["bindings"]) == 252
