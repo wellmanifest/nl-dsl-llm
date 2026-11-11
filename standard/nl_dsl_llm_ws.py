@@ -11,30 +11,32 @@ import asyncio
 import base64
 import hashlib
 import json
+import math
 import os
-from pathlib import Path
 import re
 import struct
 import sys
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from standard.nl_dsl_llm import (
+    DigitalTwinContext,
     DSLExecutor,
     DSLResult,
-    DigitalTwinContext,
     NLDSLLLMBridge,
     OptionNetworkEngine,
-    OptionNode,
 )
 
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+MAX_HANDSHAKE_BYTES = 16 * 1024
+MAX_FRAME_PAYLOAD_BYTES = 1024 * 1024
 
 
 class StreamFrameType(str, Enum):
@@ -53,7 +55,7 @@ class NLStreamFrame:
     session_id: str
     sequence: int
     timestamp_ms: float
-    payload: Dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = field(default_factory=dict)
 
     def to_json(self) -> str:
         data = {
@@ -68,18 +70,41 @@ class NLStreamFrame:
     @classmethod
     def from_json(cls, raw: str) -> NLStreamFrame:
         data = json.loads(raw)
+        invalid_data = not isinstance(data, dict)
+        if invalid_data:
+            raise ValueError("NLStreamFrame JSON must be an object")
+        raw_seq = data.get("sequence", 0)
+        if type(raw_seq) is not int or raw_seq < 0:
+            raise ValueError("NLStreamFrame sequence must be a non-negative integer")
+        raw_ts = data.get("timestamp_ms", time.time() * 1000)
+        if not isinstance(raw_ts, (int, float)) or isinstance(raw_ts, bool) or not math.isfinite(float(raw_ts)):
+            raise ValueError("NLStreamFrame timestamp_ms must be a finite number")
+        raw_payload = data.get("payload", {})
+        invalid_payload = not isinstance(raw_payload, dict)
+        if invalid_payload:
+            raise ValueError("NLStreamFrame payload must be a JSON object")
+        session_id = data.get("session_id", "default")
+        if not isinstance(session_id, str) or not session_id:
+            raise ValueError("NLStreamFrame session_id must be a non-empty string")
         return cls(
             type=StreamFrameType(data["type"]),
-            session_id=data.get("session_id", "default"),
-            sequence=int(data.get("sequence", 0)),
-            timestamp_ms=float(data.get("timestamp_ms", time.time() * 1000)),
-            payload=data.get("payload", {}),
+            session_id=session_id,
+            sequence=raw_seq,
+            timestamp_ms=float(raw_ts),
+            payload=raw_payload,
         )
 
 
-# ==============================================================================
-# RFC 6455 Minimal WebSocket Protocol Framer (Pure Standard Library)
-# ==============================================================================
+def _xor_ws_mask(payload: bytes | bytearray, mask: bytes | bytearray) -> bytes:
+    """Fast vectorized RFC 6455 4-byte XOR masking/unmasking."""
+    length = len(payload)
+    if length == 0:
+        return b""
+    repeated_mask = (bytes(mask) * ((length // 4) + 1))[:length]
+    return (
+        int.from_bytes(payload, "big") ^ int.from_bytes(repeated_mask, "big")
+    ).to_bytes(length, "big")
+
 
 def make_ws_handshake_response(key: str) -> bytes:
     """Create HTTP 101 Switching Protocols response for WebSocket upgrade."""
@@ -95,20 +120,20 @@ def make_ws_handshake_response(key: str) -> bytes:
     return response.encode("ascii")
 
 
-def encode_ws_frame(payload: bytes | str, opcode: int = 1, mask: bool = False) -> bytes:
-    """Encode a WebSocket frame (server: unmasked, client: masked).
-    
-    Opcode: 1 = text, 2 = binary, 8 = close, 9 = ping, 10 = pong.
-    """
-    if isinstance(payload, str):
-        payload_bytes = payload.encode("utf-8")
-    else:
-        payload_bytes = payload
-
+def encode_ws_frame(
+    payload: bytes | str,
+    opcode: int = 1,
+    mask: bool = False,
+    *,
+    max_payload_bytes: int = MAX_FRAME_PAYLOAD_BYTES,
+) -> bytes:
+    """Encode an RFC 6455 WebSocket frame with bounded payload size."""
+    payload_bytes = payload.encode("utf-8") if isinstance(payload, str) else payload
     length = len(payload_bytes)
-    header = bytearray()
-    header.append(0x80 | (opcode & 0x0F))
+    if length > max_payload_bytes:
+        raise ValueError(f"WebSocket payload length {length} exceeds limit {max_payload_bytes}")
 
+    header = bytearray([0x80 | (opcode & 0x0F)])
     mask_bit = 0x80 if mask else 0x00
     if length < 126:
         header.append(mask_bit | length)
@@ -122,28 +147,21 @@ def encode_ws_frame(payload: bytes | str, opcode: int = 1, mask: bool = False) -
     if mask:
         masking_key = os.urandom(4)
         header.extend(masking_key)
-        masked_payload = bytearray(length)
-        for i in range(length):
-            masked_payload[i] = payload_bytes[i] ^ masking_key[i % 4]
-        return bytes(header) + bytes(masked_payload)
+        return bytes(header) + _xor_ws_mask(payload_bytes, masking_key)
 
     return bytes(header) + payload_bytes
 
 
-def decode_ws_frame(buffer: bytearray) -> Optional[Tuple[int, bytes, int]]:
-    """Decode a WebSocket frame from client (masked or unmasked).
-    
-    Returns (opcode, unmasked_payload, consumed_bytes) or None if incomplete.
-    """
+def decode_ws_frame(
+    buffer: bytearray, *, max_payload_bytes: int = MAX_FRAME_PAYLOAD_BYTES
+) -> tuple[int, bytes, int] | None:
+    """Decode an RFC 6455 WebSocket frame, raising ValueError if payload exceeds max_payload_bytes."""
     if len(buffer) < 2:
         return None
 
-    first_byte = buffer[0]
-    second_byte = buffer[1]
-
-    opcode = first_byte & 0x0F
-    is_masked = (second_byte & 0x80) != 0
-    payload_len = second_byte & 0x7F
+    opcode = buffer[0] & 0x0F
+    is_masked = (buffer[1] & 0x80) != 0
+    payload_len = buffer[1] & 0x7F
 
     offset = 2
     if payload_len == 126:
@@ -157,140 +175,112 @@ def decode_ws_frame(buffer: bytearray) -> Optional[Tuple[int, bytes, int]]:
         payload_len = struct.unpack("!Q", buffer[2:10])[0]
         offset = 10
 
-    mask = None
+    if payload_len > max_payload_bytes:
+        raise ValueError(f"WebSocket frame payload {payload_len} exceeds max {max_payload_bytes}")
+
+    mask: bytes | None = None
     if is_masked:
         if len(buffer) < offset + 4:
             return None
-        mask = buffer[offset:offset + 4]
+        mask = bytes(buffer[offset : offset + 4])
         offset += 4
 
     if len(buffer) < offset + payload_len:
         return None
 
-    raw_data = buffer[offset:offset + payload_len]
-    if is_masked and mask:
-        unmasked = bytearray(payload_len)
-        for i in range(payload_len):
-            unmasked[i] = raw_data[i] ^ mask[i % 4]
-        payload = bytes(unmasked)
-    else:
-        payload = bytes(raw_data)
+    raw_data = bytes(buffer[offset : offset + payload_len])
+    payload = _xor_ws_mask(raw_data, mask) if (is_masked and mask is not None) else raw_data
+    return opcode, payload, offset + payload_len
 
-    consumed = offset + payload_len
-    return (opcode, payload, consumed)
-
-
-# ==============================================================================
-# Streaming Option Network Autocomplete Engine (Sub-50ms DAG Projection)
-# ==============================================================================
 
 class StreamingOptionNetworkEngine:
-    """Computes real-time DAG autocomplete suggestions from streaming prefix tokens.
-    
-    Guarantees < 5ms computation latency in-memory, well below the 50ms specification limit.
-    """
+    """Compute real-time DAG autocomplete suggestions from streaming prefix tokens (< 50ms SLA)."""
 
-    def __init__(self, context: Optional[DigitalTwinContext] = None):
+    def __init__(self, context: DigitalTwinContext | None = None) -> None:
         self.context = context or DigitalTwinContext()
         self.base_engine = OptionNetworkEngine()
 
-    def update_prefix(self, prefix: str) -> Dict[str, Any]:
-        """Compute candidate options and DAG graph for streaming prefix."""
+    def update_prefix(self, prefix: str) -> dict[str, Any]:
         t0 = time.perf_counter()
-        clean = prefix.strip()
-
-        # Query Option Network
+        clean = prefix.strip() if isinstance(prefix, str) else ""
         nodes = self.base_engine.suggest(clean, twin=self.context, max_suggestions=5)
         latency_ms = (time.perf_counter() - t0) * 1000.0
 
-        # Construct visual DAG representation
-        candidates = []
-        dag_nodes = []
-        dag_edges = []
-
         root_id = "node:root"
-        dag_nodes.append({
-            "id": root_id,
-            "label": clean or "start",
-            "type": "prefix",
-            "status": "active",
-        })
+        candidates: list[dict[str, Any]] = []
+        dag_nodes: list[dict[str, Any]] = [
+            {"id": root_id, "label": clean or "start", "type": "prefix", "status": "active"}
+        ]
+        dag_edges: list[dict[str, Any]] = []
 
-        for i, node in enumerate(nodes[:5]):
-            cand_id = f"node:cand_{i}"
-            candidates.append({
-                "id": cand_id,
-                "label": node.display_label,
-                "completion_text": node.completion_text,
-                "action_id": node.action_id,
-                "confidence": round(node.confidence, 3),
-                "badge": node.badge,
-                "requires_confirmation": node.requires_confirmation,
-                "bound_arguments": node.bound_arguments,
-            })
-            dag_nodes.append({
-                "id": cand_id,
-                "label": node.display_label,
-                "action_id": node.action_id,
-                "confidence": round(node.confidence, 3),
-                "badge": node.badge,
-                "type": "command_candidate",
-            })
-            dag_edges.append({
-                "from": root_id,
-                "to": cand_id,
-                "weight": round(node.confidence, 3),
-            })
+        for idx, node in enumerate(nodes[:5]):
+            cand_id = f"node:cand_{idx}"
+            candidates.append(
+                {
+                    "id": cand_id,
+                    "label": node.display_label,
+                    "completion_text": node.completion_text,
+                    "action_id": node.action_id,
+                    "confidence": round(node.confidence, 3),
+                    "badge": node.badge,
+                    "requires_confirmation": node.requires_confirmation,
+                    "bound_arguments": node.bound_arguments,
+                }
+            )
+            dag_nodes.append(
+                {
+                    "id": cand_id,
+                    "label": node.display_label,
+                    "action_id": node.action_id,
+                    "confidence": round(node.confidence, 3),
+                    "badge": node.badge,
+                    "type": "command_candidate",
+                }
+            )
+            dag_edges.append({"from": root_id, "to": cand_id, "weight": round(node.confidence, 3)})
 
-            # Sub-options (child edges in DAG)
-            for j, sub in enumerate(node.next_options[:3]):
-                sub_id = f"node:sub_{i}_{j}"
-                dag_nodes.append({
-                    "id": sub_id,
-                    "label": sub.display_label,
-                    "type": "param_option",
-                })
-                dag_edges.append({
-                    "from": cand_id,
-                    "to": sub_id,
-                    "weight": round(sub.confidence, 3),
-                })
+            for sub_idx, sub in enumerate(node.next_options[:3]):
+                sub_id = f"node:sub_{idx}_{sub_idx}"
+                dag_nodes.append({"id": sub_id, "label": sub.display_label, "type": "param_option"})
+                dag_edges.append({"from": cand_id, "to": sub_id, "weight": round(sub.confidence, 3)})
 
         return {
             "prefix": clean,
             "candidates": candidates,
-            "dag": {
-                "nodes": dag_nodes,
-                "edges": dag_edges,
-            },
+            "dag": {"nodes": dag_nodes, "edges": dag_edges},
             "candidate_count": len(candidates),
             "latency_ms": round(latency_ms, 3),
             "sla_met": latency_ms < 50.0,
         }
 
 
-# ==============================================================================
-# Async WebSocket Server Implementation
-# ==============================================================================
-
 class NLStreamServer:
     """Async WebSocket streaming server for NL-DSL-LLM sessions."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8765):
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        *,
+        max_handshake_bytes: int = MAX_HANDSHAKE_BYTES,
+        max_frame_payload_bytes: int = MAX_FRAME_PAYLOAD_BYTES,
+    ) -> None:
         self.host = host
         self.port = port
-        self.server: Optional[asyncio.Server] = None
+        self.max_handshake_bytes = max_handshake_bytes
+        self.max_frame_payload_bytes = max_frame_payload_bytes
+        self.server: asyncio.Server | None = None
         self.engine = StreamingOptionNetworkEngine()
         self.executor = DSLExecutor()
-        self.executor.register("ticket", "list", lambda cmd: [{"id": "ticket-001", "title": "Example task", "status": "OPEN"}])
+        self.executor.register("ticket", "list", lambda _cmd: [{"id": "ticket-001", "title": "Example task", "status": "OPEN"}])
         self.executor.register("ticket", "create", lambda cmd: {"id": "ticket-002", "title": cmd.arguments.get("title", "New task"), "status": "OPEN"})
         self.executor.register("ticket", "close", lambda cmd: {"id": cmd.arguments.get("id", "ticket-001"), "status": "CLOSED"})
         self.executor.register("service", "restart", lambda cmd: {"service": cmd.arguments.get("target", "auth-service"), "status": "restarted"})
         self.executor.register("service", "stop", lambda cmd: {"service": cmd.arguments.get("target", "auth-service"), "status": "stopped"})
-        self.executor.register("cluster", "status", lambda cmd: {"cluster": "ready", "env": "prod"})
+        self.executor.register("cluster", "status", lambda _cmd: {"cluster": "ready", "env": "prod"})
         self.bridge = NLDSLLLMBridge(executor=self.executor)
-        self.active_sessions: Dict[str, Dict[str, Any]] = {}
-        self._client_tasks: set[asyncio.Task] = set()
+        self.active_sessions: dict[str, dict[str, Any]] = {}
+        self._client_tasks: set[asyncio.Task[Any]] = set()
         self._seq = 0
 
     def _next_seq(self) -> int:
@@ -298,29 +288,37 @@ class NLStreamServer:
         return self._seq
 
     async def start(self) -> None:
-        """Start listening for incoming WebSocket connections."""
-        self.server = await asyncio.start_server(
-            self.handle_client, self.host, self.port
-        )
+        self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
 
     async def stop(self) -> None:
-        """Stop server and close active connections."""
-        for t in list(self._client_tasks):
-            t.cancel()
+        for task in list(self._client_tasks):
+            task.cancel()
         if self.server:
             self.server.close()
             await self.server.wait_closed()
 
+    async def _send_error(
+        self, writer: asyncio.StreamWriter, session_id: str, code: str, message: str
+    ) -> None:
+        err_frame = NLStreamFrame(
+            type=StreamFrameType.STREAM_ERROR,
+            session_id=session_id,
+            sequence=self._next_seq(),
+            timestamp_ms=time.time() * 1000,
+            payload={"error": message, "code": code},
+        )
+        writer.write(encode_ws_frame(err_frame.to_json()))
+        await writer.drain()
+
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
-        """Handle WebSocket upgrade and bidirectional frame dispatch."""
         task = asyncio.current_task()
         if task:
             self._client_tasks.add(task)
         buffer = bytearray()
         handshake_done = False
-        session_id = f"sess_{int(time.time() * 1000)}"
+        session_id = f"sess_{int(time.time() * 1000)}_{self._next_seq()}"
         self.active_sessions[session_id] = {
             "accumulated_text": "",
             "audio_chunk_count": 0,
@@ -329,53 +327,50 @@ class NLStreamServer:
 
         try:
             while True:
-                # 1. Perform HTTP WebSocket Handshake if needed
                 if not handshake_done:
                     header_end = buffer.find(b"\r\n\r\n")
                     if header_end == -1:
+                        if len(buffer) > self.max_handshake_bytes:
+                            writer.write(b"HTTP/1.1 431 Request Header Fields Too Large\r\n\r\n")
+                            await writer.drain()
+                            return
                         data = await reader.read(4096)
                         if not data:
                             break
                         buffer.extend(data)
                         continue
                     header_text = buffer[:header_end].decode("latin-1")
-                    buffer = buffer[header_end + 4:]
+                    del buffer[: header_end + 4]
 
                     key_match = re.search(r"Sec-WebSocket-Key:\s*([^\r\n]+)", header_text, re.IGNORECASE)
                     if not key_match:
                         writer.write(b"HTTP/1.1 400 Bad Request\r\n\r\n")
                         await writer.drain()
-                        writer.close()
                         return
 
-                    ws_key = key_match.group(1).strip()
-                    handshake_response = make_ws_handshake_response(ws_key)
-                    writer.write(handshake_response)
+                    writer.write(make_ws_handshake_response(key_match.group(1).strip()))
                     await writer.drain()
                     handshake_done = True
 
-                # 2. Process WebSocket Frames from buffer
-                frame = decode_ws_frame(buffer)
+                frame = decode_ws_frame(buffer, max_payload_bytes=self.max_frame_payload_bytes)
                 if frame is not None:
                     opcode, payload, consumed = frame
-                    buffer = buffer[consumed:]
+                    del buffer[:consumed]
 
-                    if opcode == 8:  # Connection Close
-                        close_frame = encode_ws_frame(b"", opcode=8)
-                        writer.write(close_frame)
+                    if opcode == 8:
+                        writer.write(encode_ws_frame(b"", opcode=8))
                         await writer.drain()
                         return
-                    elif opcode == 9:  # Ping
-                        pong_frame = encode_ws_frame(payload, opcode=10)
-                        writer.write(pong_frame)
+                    if opcode == 9:
+                        writer.write(encode_ws_frame(payload, opcode=10))
                         await writer.drain()
-                    elif opcode in (1, 2):  # Text or Binary
-                        await self._dispatch_message(
-                            session_id, payload, opcode, writer
-                        )
+                    elif opcode in (1, 2):
+                        await self._dispatch_message(session_id, payload, opcode, writer)
                     continue
 
-                # Buffer has incomplete frame; read more from network
+                if len(buffer) > self.max_frame_payload_bytes + 16:
+                    await self._send_error(writer, session_id, "ERR_FRAME_TOO_LARGE", "Frame buffer exceeded limit")
+                    return
                 data = await reader.read(4096)
                 if not data:
                     break
@@ -383,28 +378,20 @@ class NLStreamServer:
 
         except asyncio.CancelledError:
             pass
-        except Exception as error:
-            error_frame = NLStreamFrame(
-                type=StreamFrameType.STREAM_ERROR,
-                session_id=session_id,
-                sequence=self._next_seq(),
-                timestamp_ms=time.time() * 1000,
-                payload={"error": str(error), "code": "ERR_STREAM_EXCEPTION"},
-            )
+        except Exception as error:  # noqa: BLE001
             try:
-                writer.write(encode_ws_frame(error_frame.to_json()))
-                await writer.drain()
-            except Exception:
+                if handshake_done:
+                    await self._send_error(writer, session_id, "ERR_STREAM_EXCEPTION", str(error))
+            except OSError:
                 pass
         finally:
             if task:
                 self._client_tasks.discard(task)
-            if session_id in self.active_sessions:
-                del self.active_sessions[session_id]
+            self.active_sessions.pop(session_id, None)
             try:
                 writer.close()
                 await writer.wait_closed()
-            except Exception:
+            except OSError:
                 pass
 
     async def _dispatch_message(
@@ -414,22 +401,18 @@ class NLStreamServer:
         opcode: int,
         writer: asyncio.StreamWriter,
     ) -> None:
-        """Parse incoming JSON or binary frame and emit streaming responses."""
         session = self.active_sessions.get(session_id, {})
-
-        if opcode == 2:  # Raw audio chunk
+        if opcode == 2:
             session["audio_chunk_count"] = session.get("audio_chunk_count", 0) + 1
             return
 
-        # Text Frame: JSON message
         try:
-            text = payload.decode("utf-8")
-            frame_in = NLStreamFrame.from_json(text)
-        except Exception:
+            frame_in = NLStreamFrame.from_json(payload.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
+            await self._send_error(writer, session_id, "ERR_INVALID_FRAME", str(exc))
             return
 
         if frame_in.type == StreamFrameType.STREAM_START:
-            # Client Handshake Acknowledged
             resp = NLStreamFrame(
                 type=StreamFrameType.STREAM_START,
                 session_id=session_id,
@@ -448,56 +431,46 @@ class NLStreamServer:
         elif frame_in.type == StreamFrameType.AUDIO_CHUNK:
             session["audio_chunk_count"] = session.get("audio_chunk_count", 0) + 1
             partial_text = frame_in.payload.get("partial_text", "")
-            if partial_text:
+            if isinstance(partial_text, str) and partial_text:
                 session["accumulated_text"] = partial_text
-                # Emit TRANSCRIPTION_PARTIAL
                 trans_frame = NLStreamFrame(
                     type=StreamFrameType.TRANSCRIPTION_PARTIAL,
                     session_id=session_id,
                     sequence=self._next_seq(),
                     timestamp_ms=time.time() * 1000,
-                    payload={
-                        "text": partial_text,
-                        "stability": 0.85,
-                        "is_final": False,
-                    },
+                    payload={"text": partial_text, "stability": 0.85, "is_final": False},
                 )
                 writer.write(encode_ws_frame(trans_frame.to_json()))
-
-                # Stream Option Network Autocomplete immediately
-                opt_data = self.engine.update_prefix(partial_text)
                 opt_frame = NLStreamFrame(
                     type=StreamFrameType.OPTION_NETWORK_UPDATE,
                     session_id=session_id,
                     sequence=self._next_seq(),
                     timestamp_ms=time.time() * 1000,
-                    payload=opt_data,
+                    payload=self.engine.update_prefix(partial_text),
                 )
                 writer.write(encode_ws_frame(opt_frame.to_json()))
                 await writer.drain()
 
         elif frame_in.type == StreamFrameType.TRANSCRIPTION_PARTIAL:
-            # Direct text streaming update (e.g. keystroke or frontend STT)
-            current_prefix = frame_in.payload.get("text", "")
+            raw_prefix = frame_in.payload.get("text", "")
+            current_prefix = raw_prefix if isinstance(raw_prefix, str) else ""
             session["accumulated_text"] = current_prefix
-            opt_data = self.engine.update_prefix(current_prefix)
             opt_frame = NLStreamFrame(
                 type=StreamFrameType.OPTION_NETWORK_UPDATE,
                 session_id=session_id,
                 sequence=self._next_seq(),
                 timestamp_ms=time.time() * 1000,
-                payload=opt_data,
+                payload=self.engine.update_prefix(current_prefix),
             )
             writer.write(encode_ws_frame(opt_frame.to_json()))
             await writer.drain()
 
         elif frame_in.type == StreamFrameType.COMMAND_COMMITTED:
-            # User confirmed/spoke full command: process through 4-tier pipeline
-            command_text = frame_in.payload.get("text") or session.get("accumulated_text", "")
+            raw_cmd = frame_in.payload.get("text")
+            command_text = raw_cmd if isinstance(raw_cmd, str) and raw_cmd else session.get("accumulated_text", "")
             t_exec_0 = time.perf_counter()
             result: DSLResult = self.bridge.handle_request(command_text)
             exec_ms = (time.perf_counter() - t_exec_0) * 1000.0
-
             res_frame = NLStreamFrame(
                 type=StreamFrameType.COMMAND_RESULT,
                 session_id=session_id,
