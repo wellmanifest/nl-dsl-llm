@@ -1,0 +1,98 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-014",
+  "summary": "Modularize NL-DSL-LLM standard modules and harden WS framing, DSL quoting, and System One ACL/NaN validation",
+  "workstream": "integration",
+  "classification": {
+    "kind": "BUG",
+    "priority": "P2",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "project/ticket-014/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    "standard/**"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [
+    "python"
+  ],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "aa47c8752f1ea446208f6dfb7a018ad02e92250a",
+    "targetBranch": "main",
+    "outcome": "Decompose standard/nl_dsl_llm.py, standard/system_one_decision.py, and standard/nl_dsl_llm_ws.py below 500 lines each and fix quoted DSL parsing, WebSocket handshake/payload bounds and session collisions, URL-encoded Action URIs, NaN/bool envelope validation, and empty-ACL bypass in select_operation.",
+    "nonGoals": [
+      "No breaking wire changes to existing valid envelopes or schemas",
+      "No new mandatory runtime dependencies"
+    ],
+    "complexity": "M",
+    "estimatedMinutes": 35,
+    "budgets": {
+      "maxImplementationFiles": 6,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 0,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Extract core DSL/NL/cache/option-network models into standard/nl_dsl_core.py and System One model profiles/scoring helpers into standard/system_one_profiles.py while preserving full public re-exports in standard/nl_dsl_llm.py and standard/system_one_decision.py, and harden standard/nl_dsl_llm_ws.py.",
+      "components": [
+        {
+          "name": "nl-dsl-standard-core",
+          "paths": [
+            "standard/nl_dsl_core.py",
+            "standard/nl_dsl_llm.py",
+            "standard/nl_dsl_llm_ws.py"
+          ]
+        },
+        {
+          "name": "system-one-decision-standard",
+          "paths": [
+            "standard/system_one_profiles.py",
+            "standard/system_one_decision.py",
+            "standard/test_hardening.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-014 merge commit."
+    },
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider"
+        ],
+        "evidence": "project/ticket-014/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "python3 standard/nl_dsl_llm.py --self-test"
+        ],
+        "evidence": "project/ticket-014/README.md"
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "./project/governance-check.sh --base origin/main"
+        ],
+        "evidence": "project/ticket-014/README.md"
+      }
+    ],
+    "runtimeDependencies": []
+  }
+}
