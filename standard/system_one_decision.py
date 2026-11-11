@@ -8,14 +8,11 @@ wellmanifest/dsl, wellmanifest/policy-dsl, and wellmanifest/nl-*.
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import json
-import math
 import time
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
-from urllib.parse import quote
 
 from standard.nl_dsl_llm import (
     DigitalTwinContext,
@@ -33,10 +30,15 @@ from standard.system_one_profiles import (
     CrossQuestionConstraint,
     DecisionCandidate,
     SystemOneModelProfile,
+    _format_action_uri,
+    _format_bound_dsl,
+    _is_finite_number,
+    _parse_contract_risk,
     _score_candidate,
     _softmax,
     _tokenize,
     select_decision_profile,
+    validate_system_one_decision_envelope,
 )
 
 __all__ = [
@@ -57,46 +59,6 @@ __all__ = [
     "select_operation",
     "validate_system_one_decision_envelope",
 ]
-
-
-@functools.lru_cache(maxsize=1)
-def _load_schema_keys() -> tuple[frozenset[str], frozenset[str]]:
-    schema_doc = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    return frozenset(schema_doc["required"]), frozenset(schema_doc["properties"].keys())
-
-
-def _is_finite_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-
-
-def _format_bound_dsl(action_id: str, bound_arguments: Mapping[str, Any]) -> str:
-    base = action_id if "." in action_id else f"{action_id}.execute"
-    if not bound_arguments:
-        return base
-    parts: list[str] = []
-    for key in sorted(bound_arguments):
-        raw_val = bound_arguments[key]
-        if isinstance(raw_val, (dict, list)):
-            formatted = json.dumps(raw_val, ensure_ascii=False, separators=(",", ":"))
-        else:
-            text_val = str(raw_val)
-            formatted = (
-                json.dumps(text_val, ensure_ascii=False)
-                if (not text_val or any(ch.isspace() or ch in ('"', "'") for ch in text_val))
-                else text_val
-            )
-        parts.append(f"{key}={formatted}")
-    return f"{base} " + " ".join(parts)
-
-
-def _format_action_uri(uri_base: str, bound_arguments: Mapping[str, Any]) -> str:
-    if not bound_arguments or "?" in uri_base:
-        return uri_base
-    query = "&".join(
-        f"{quote(str(k), safe='._~-')}={quote(str(bound_arguments[k]), safe='._~-')}"
-        for k in sorted(bound_arguments)
-    )
-    return f"{uri_base}?{query}"
 
 
 def candidates_from_option_nodes(nodes: Sequence[OptionNode]) -> list[DecisionCandidate]:
@@ -176,7 +138,10 @@ class SystemOneDecisionEngine:
         best_idx = max(range(len(candidates)), key=lambda idx: choice_probs[idx])
         winner = candidates[best_idx]
         confidence = choice_probs[best_idx]
-        risk = max(1, min(3, int(winner.risk_level)))
+        invalid_risk = type(winner.risk_level) is not int
+        if invalid_risk:
+            raise ValueError("DecisionCandidate.risk_level must be an integer")
+        risk = max(1, min(3, winner.risk_level))
 
         risk_probs_list = _softmax([2.4 if level == risk else -1.1 for level in (1, 2, 3)])
         risk_probs = {str(idx + 1): risk_probs_list[idx] for idx in range(3)}
@@ -232,7 +197,11 @@ class SystemOneDecisionEngine:
         nodes = engine.suggest(query, twin=twin, max_suggestions=16)
         if not nodes:
             active_twin = twin or DigitalTwinContext()
-            svc = active_twin.active_services[0] if active_twin.active_services else "default-service"
+            svc = (
+                active_twin.active_services[0]
+                if active_twin.active_services
+                else "default-service"
+            )
             nodes = [
                 OptionNode(
                     id=f"{tpl['action_id']}:{svc}",
@@ -241,7 +210,9 @@ class SystemOneDecisionEngine:
                     action_id=tpl["action_id"],
                     resolved_uri=tpl["uri_pattern"],
                     bound_arguments={"target": svc, "env": active_twin.environment},
-                    requires_confirmation=bool(tpl["destructive"] and active_twin.environment == "prod"),
+                    requires_confirmation=bool(
+                        tpl["destructive"] and active_twin.environment == "prod"
+                    ),
                     badge="PROD" if active_twin.environment == "prod" else "",
                 )
                 for tpl in engine.ACTION_TEMPLATES
@@ -249,108 +220,19 @@ class SystemOneDecisionEngine:
         return self.decide(query, candidates_from_option_nodes(nodes))
 
 
-def validate_system_one_decision_envelope(envelope: Mapping[str, Any]) -> None:
-    """Deterministic validator for wellmanifest.system-one-decision/v1 envelopes."""
-    invalid_env = not isinstance(envelope, Mapping)
-    if invalid_env:
-        raise ValueError("Envelope must be a mapping")
-    required_keys, allowed_keys = _load_schema_keys()
-    actual_keys = set(envelope.keys())
-
-    missing = required_keys - actual_keys
-    extra = actual_keys - allowed_keys
-    if missing or extra:
-        raise ValueError(f"Invalid envelope keys: missing={sorted(missing)}, extra={sorted(extra)}")
-    if envelope.get("schema") != SCHEMA_ID:
-        raise ValueError(f"Invalid schema: {envelope.get('schema')}")
-    model_id = envelope.get("model_id")
-    if not isinstance(model_id, str) or model_id not in SYSTEM_ONE_PROFILES:
-        raise ValueError(f"Unsupported model_id: {model_id}")
-    expected_family = SYSTEM_ONE_PROFILES[model_id].family
-    if envelope.get("model_family") != expected_family:
-        raise ValueError(f"model_family mismatch: {envelope.get('model_family')} != {expected_family}")
-
-    questions = envelope.get("questions")
-    if not isinstance(questions, list) or len(questions) != 3 or not all(isinstance(q, Mapping) for q in questions):
-        raise ValueError("questions must be a 3-element list of objects")
-    q_choice, q_score, q_noul = questions
-    if q_choice.get("name") != "uri_choice" or q_choice.get("type") != "choice":
-        raise ValueError("questions[0] must be uri_choice (choice)")
-    if q_score.get("name") != "risk_score" or q_score.get("type") != "score" or q_score.get("options") != ["1", "2", "3"]:
-        raise ValueError("questions[1] must be risk_score (score) with options ['1', '2', '3']")
-    if q_noul.get("name") != "execution_allowed" or q_noul.get("type") != "noul" or q_noul.get("options") != ["yes", "no"]:
-        raise ValueError("questions[2] must be execution_allowed (noul) with options ['yes', 'no']")
-
-    uri_options = q_choice.get("options")
-    if (
-        not isinstance(uri_options, list)
-        or not (1 <= len(uri_options) <= 255)
-        or not all(isinstance(u, str) for u in uri_options)
-        or len(set(uri_options)) != len(uri_options)
-    ):
-        raise ValueError("uri_choice options must be 1..255 unique Action URIs")
-    for uri in uri_options:
-        if not ACTION_URI_RE.fullmatch(uri):
-            raise ValueError(f"Invalid Action URI in options: {uri}")
-
-    answers = envelope.get("answers")
-    if not isinstance(answers, Mapping) or set(answers.keys()) != {"uri_choice", "risk_score", "execution_allowed"}:
-        raise ValueError("answers must contain exactly uri_choice, risk_score, execution_allowed")
-    if answers["uri_choice"] not in uri_options or envelope.get("selected_uri") != answers["uri_choice"]:
-        raise ValueError("selected_uri and answers.uri_choice must match an option in questions[0]")
-    raw_risk = envelope.get("risk_score")
-    if answers["risk_score"] not in ("1", "2", "3") or type(raw_risk) is not int or raw_risk != int(answers["risk_score"]):
-        raise ValueError("risk_score must be an integer matching answers.risk_score in {1, 2, 3}")
-    raw_allowed = envelope.get("execution_allowed")
-    if answers["execution_allowed"] not in ("yes", "no") or not isinstance(raw_allowed, bool) or raw_allowed != (answers["execution_allowed"] == "yes"):
-        raise ValueError("execution_allowed boolean must match answers.execution_allowed")
-
-    confidence = envelope.get("confidence")
-    if not _is_finite_number(confidence) or not (0.0 <= float(confidence) <= 1.0):
-        raise ValueError(f"Invalid confidence: {confidence}")
-    latency_ms = envelope.get("latency_ms")
-    if not _is_finite_number(latency_ms) or float(latency_ms) < 0.0:
-        raise ValueError(f"Invalid latency_ms: {latency_ms}")
-
-    if "selected_dsl" in envelope and (
-        not isinstance(envelope["selected_dsl"], str) or not CANONICAL_DSL_RE.fullmatch(envelope["selected_dsl"])
-    ):
-        raise ValueError(f"Invalid selected_dsl: {envelope['selected_dsl']}")
-
-    probs = envelope.get("probabilities")
-    if not isinstance(probs, Mapping) or set(probs.keys()) != {"uri_choice", "risk_score", "execution_allowed"}:
-        raise ValueError("probabilities must contain uri_choice, risk_score, execution_allowed")
-    if not all(isinstance(probs[g], Mapping) for g in ("uri_choice", "risk_score", "execution_allowed")):
-        raise ValueError("probability groups must be mappings")
-    if set(probs["uri_choice"].keys()) != set(uri_options):
-        raise ValueError("probabilities.uri_choice keys must match questions[0].options")
-    if set(probs["risk_score"].keys()) != {"1", "2", "3"}:
-        raise ValueError("probabilities.risk_score keys must be {'1', '2', '3'}")
-    if set(probs["execution_allowed"].keys()) != {"yes", "no"}:
-        raise ValueError("probabilities.execution_allowed keys must be {'yes', 'no'}")
-
-    for group_name, dist in probs.items():
-        vals = list(dist.values())
-        if any(not _is_finite_number(v) or float(v) < 0.0 or float(v) > 1.0 for v in vals):
-            raise ValueError(f"Invalid probability value in {group_name}")
-        if abs(sum(float(v) for v in vals) - 1.0) > 1e-4:
-            raise ValueError(f"Probabilities in {group_name} must sum to 1.0")
-
-
 def _compute_registry_digest(candidate_contracts: Sequence[Mapping[str, Any]]) -> str:
-    canonical = json.dumps(
-        [
+    entries = []
+    for c in candidate_contracts:
+        risk_val, _ = _parse_contract_risk(c.get("risk_level", 1))
+        entries.append(
             {
                 "uri": str(c.get("uri", "")),
                 "dsl_command": str(c.get("dsl_command", c.get("action_id", ""))),
                 "description": str(c.get("description", "")),
-                "risk_level": int(c.get("risk_level", 1)),
+                "risk_level": risk_val,
             }
-            for c in candidate_contracts
-        ],
-        sort_keys=True,
-        separators=(",", ":"),
-    )
+        )
+    canonical = json.dumps(entries, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -359,18 +241,22 @@ def build_selection_question(
     candidate_contracts: Sequence[Mapping[str, Any]],
     bounded_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build canonical System One / Jev choice question with op_0..op_N bindings and 3 escape outcomes."""
-    ctx = dict(bounded_context or {})
+    """Build canonical System One / Jev choice question with op_0..op_N bindings and 3 escapes."""
+    ctx = dict(bounded_context) if isinstance(bounded_context, Mapping) else {}
+    bounded_contracts = [
+        dict(contract) if isinstance(contract, Mapping) else {}
+        for contract in candidate_contracts[:252]
+    ]
     bindings: dict[str, dict[str, Any]] = {}
     options: list[str] = []
-    for idx, contract in enumerate(candidate_contracts[:252]):
+    for idx, contract in enumerate(bounded_contracts):
         op_id = f"op_{idx}"
         options.append(op_id)
-        bindings[op_id] = dict(contract)
+        bindings[op_id] = contract
     options.extend(SPECIAL_OUTCOMES)
     return {
-        "request": request,
-        "registry_digest": _compute_registry_digest(candidate_contracts),
+        "request": request if isinstance(request, str) else "",
+        "registry_digest": _compute_registry_digest(bounded_contracts),
         "bounded_context": ctx,
         "options": options,
         "bindings": bindings,
@@ -389,44 +275,64 @@ def select_operation(
     *,
     decision_provider: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Canonical System One / Jev operation selector enforcing op_0..op_N bindings and 6 safety gates."""
-    ctx = dict(bounded_context or {})
+    """Canonical System One / Jev operation selector enforcing op_0..op_N bindings and 6 gates."""
+    ctx = dict(bounded_context) if isinstance(bounded_context, Mapping) else {}
     question_spec = build_selection_question(request, candidate_contracts, ctx)
     bindings: dict[str, dict[str, Any]] = question_spec["bindings"]
     options: list[str] = question_spec["options"]
     expected_digest = question_spec["registry_digest"]
+    bounded_contracts = list(bindings.values())
 
-    q_lower = request.strip().lower()
+    q_lower = request.strip().lower() if isinstance(request, str) else ""
     q_tokens = _tokenize(q_lower)
     confidence_valid = True
+    chosen_valid = True
+    digest_valid = True
 
     if decision_provider is not None:
-        raw_decision = dict(decision_provider(question_spec))
-        chosen_option = str(raw_decision.get("chosen_option", "none"))
+        provider_out = decision_provider(question_spec)
+        raw_decision = dict(provider_out) if isinstance(provider_out, Mapping) else {}
+        raw_chosen = raw_decision.get("chosen_option", "none")
+        if isinstance(raw_chosen, str):
+            chosen_option = raw_chosen
+        else:
+            chosen_option = "none"
+            chosen_valid = False
         raw_conf = raw_decision.get("confidence", 0.0)
         if _is_finite_number(raw_conf) and 0.0 <= float(raw_conf) <= 1.0:
             confidence = float(raw_conf)
         else:
             confidence = 0.0
             confidence_valid = False
-        provided_digest = str(raw_decision.get("registry_digest", expected_digest))
+        raw_digest = raw_decision.get("registry_digest", expected_digest)
+        if isinstance(raw_digest, str):
+            provided_digest = raw_digest
+        else:
+            provided_digest = ""
+            digest_valid = False
     else:
-        if not candidate_contracts or not q_tokens:
+        if not bounded_contracts or not q_tokens:
             chosen_option, confidence = "none", 1.0
         elif any(sep in q_lower for sep in (" nastepnie ", " a potem ", " and then ", " then ")):
             chosen_option, confidence = "need_multi_step", 0.9
         else:
-            decision_cands = [
-                DecisionCandidate(
-                    uri=str(c.get("uri", f"proc://taskand.dev/op/{idx}/v1")),
-                    dsl_command=str(c.get("dsl_command", c.get("action_id", f"op.exec_{idx}"))),
-                    description=str(c.get("description", "")),
-                    keywords=tuple(str(k) for k in c.get("keywords", ())),
-                    risk_level=int(c.get("risk_level", 1)),
-                    prior_boost=float(c.get("prior_boost", 0.0)),
+            decision_cands = []
+            for idx, c in enumerate(bounded_contracts):
+                risk_val, _ = _parse_contract_risk(c.get("risk_level", 1))
+                raw_boost = c.get("prior_boost", 0.0)
+                boost_val = float(raw_boost) if _is_finite_number(raw_boost) else 0.0
+                raw_kw = c.get("keywords", ())
+                kw_seq = raw_kw if isinstance(raw_kw, (list, tuple, set, frozenset)) else ()
+                decision_cands.append(
+                    DecisionCandidate(
+                        uri=str(c.get("uri", f"proc://taskand.dev/op/{idx}/v1")),
+                        dsl_command=str(c.get("dsl_command", c.get("action_id", f"op.exec_{idx}"))),
+                        description=str(c.get("description", "")),
+                        keywords=tuple(str(k) for k in kw_seq),
+                        risk_level=risk_val,
+                        prior_boost=boost_val,
+                    )
                 )
-                for idx, c in enumerate(candidate_contracts[:252])
-            ]
             logits = [_score_candidate(q_tokens, q_lower, dc) for dc in decision_cands]
             if max(logits) <= -1.0:
                 chosen_option, confidence = "none", 0.85
@@ -445,7 +351,9 @@ def select_operation(
     raw_allowed_uris = (
         ctx["allowed_uris"]
         if explicit_acl
-        else [c.get("uri") for c in candidate_contracts if isinstance(c.get("uri"), str) and c.get("uri")]
+        else [
+            c.get("uri") for c in bounded_contracts if isinstance(c.get("uri"), str) and c.get("uri")
+        ]
     )
     acl_valid = isinstance(raw_allowed_uris, (list, tuple, set, frozenset)) and all(
         isinstance(item, str) for item in raw_allowed_uris
@@ -454,26 +362,46 @@ def select_operation(
     approved_high_risk = ctx.get("approved_high_risk") is True
 
     gate_1_membership = (
-        confidence_valid
+        chosen_valid
+        and confidence_valid
         and chosen_option in options
         and (chosen_option in SPECIAL_OUTCOMES or chosen_option in bindings)
     )
-    gate_2_digest = provided_digest == expected_digest
+    gate_2_digest = digest_valid and provided_digest == expected_digest
     gate_3_schema = True
     gate_4_acl = acl_valid
     gate_5_approval = True
     gate_6_effect = True
 
     if selected_contract is not None:
-        required_args = tuple(selected_contract.get("required_args", ()))
-        bound_args = dict(selected_contract.get("arguments", ctx.get("arguments", {})))
-        gate_3_schema = all(arg in bound_args and bound_args[arg] not in (None, "") for arg in required_args)
-        uri_val = str(selected_contract.get("uri", ""))
-        gate_4_acl = acl_valid and bool(uri_val) and (uri_val in allowed_uris if explicit_acl or allowed_uris else True)
-        risk_level = int(selected_contract.get("risk_level", 1))
-        requires_approval = bool(selected_contract.get("requires_approval", risk_level >= 3))
+        risk_level, risk_ok = _parse_contract_risk(selected_contract.get("risk_level", 1))
+        raw_req_args = selected_contract.get("required_args", ())
+        req_args_ok = isinstance(raw_req_args, (list, tuple, set, frozenset)) and all(
+            isinstance(arg, str) and bool(arg) for arg in raw_req_args
+        )
+        raw_args = selected_contract.get("arguments", ctx.get("arguments", {}))
+        args_ok = isinstance(raw_args, Mapping)
+        bound_args = dict(raw_args) if args_ok else {}
+        required_args = tuple(raw_req_args) if req_args_ok else ()
+        gate_3_schema = (
+            risk_ok
+            and req_args_ok
+            and args_ok
+            and all(arg in bound_args and bound_args[arg] not in (None, "") for arg in required_args)
+        )
+        raw_uri = selected_contract.get("uri")
+        uri_val = raw_uri if isinstance(raw_uri, str) else ""
+        gate_4_acl = (
+            acl_valid
+            and bool(uri_val)
+            and (uri_val in allowed_uris if explicit_acl or allowed_uris else True)
+        )
+        raw_req_approval = selected_contract.get("requires_approval")
+        requires_approval = (
+            raw_req_approval if isinstance(raw_req_approval, bool) else (risk_level >= 3)
+        )
         gate_5_approval = (not requires_approval) or approved_high_risk
-        gate_6_effect = bool(selected_contract.get("effect_verifiable", True))
+        gate_6_effect = selected_contract.get("effect_verifiable", True) is True
 
     gates = {
         "gate_1_candidate_membership": gate_1_membership,
@@ -484,13 +412,17 @@ def select_operation(
         "gate_6_effect_verification": gate_6_effect,
     }
     all_gates_passed = (
-        all(gates.values()) and chosen_option not in SPECIAL_OUTCOMES and selected_contract is not None
+        all(gates.values())
+        and chosen_option not in SPECIAL_OUTCOMES
+        and selected_contract is not None
     )
 
     return {
         "chosen_option": chosen_option if gate_1_membership else "none",
         "selected_contract": selected_contract if all_gates_passed else None,
-        "selected_uri": selected_contract.get("uri") if (selected_contract and all_gates_passed) else None,
+        "selected_uri": (
+            selected_contract.get("uri") if (selected_contract and all_gates_passed) else None
+        ),
         "confidence": round(confidence, 6),
         "registry_digest": expected_digest,
         "gates": gates,

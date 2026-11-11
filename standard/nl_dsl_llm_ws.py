@@ -8,17 +8,8 @@ DAG autocomplete projection with sub-50ms latency, and 4-tier pipeline integrati
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
-import json
-import math
-import os
-import re
-import struct
 import sys
 import time
-from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -33,164 +24,37 @@ from standard.nl_dsl_llm import (
     NLDSLLLMBridge,
     OptionNetworkEngine,
 )
+from standard.nl_dsl_ws_framing import (
+    MAX_CONTROL_FRAME_BYTES,
+    MAX_FRAME_PAYLOAD_BYTES,
+    MAX_HANDSHAKE_BYTES,
+    MAX_JSON_DEPTH,
+    WS_GUID,
+    NLStreamFrame,
+    StreamFrameType,
+    _xor_ws_mask,
+    decode_ws_frame,
+    encode_ws_frame,
+    make_ws_handshake_response,
+    parse_ws_upgrade_key,
+)
 
-WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-MAX_HANDSHAKE_BYTES = 16 * 1024
-MAX_FRAME_PAYLOAD_BYTES = 1024 * 1024
-
-
-class StreamFrameType(str, Enum):
-    STREAM_START = "STREAM_START"
-    AUDIO_CHUNK = "AUDIO_CHUNK"
-    TRANSCRIPTION_PARTIAL = "TRANSCRIPTION_PARTIAL"
-    OPTION_NETWORK_UPDATE = "OPTION_NETWORK_UPDATE"
-    COMMAND_COMMITTED = "COMMAND_COMMITTED"
-    COMMAND_RESULT = "COMMAND_RESULT"
-    STREAM_ERROR = "STREAM_ERROR"
-
-
-@dataclass
-class NLStreamFrame:
-    type: StreamFrameType
-    session_id: str
-    sequence: int
-    timestamp_ms: float
-    payload: dict[str, Any] = field(default_factory=dict)
-
-    def to_json(self) -> str:
-        data = {
-            "type": self.type.value if isinstance(self.type, StreamFrameType) else str(self.type),
-            "session_id": self.session_id,
-            "sequence": self.sequence,
-            "timestamp_ms": self.timestamp_ms,
-            "payload": self.payload,
-        }
-        return json.dumps(data)
-
-    @classmethod
-    def from_json(cls, raw: str) -> NLStreamFrame:
-        data = json.loads(raw)
-        invalid_data = not isinstance(data, dict)
-        if invalid_data:
-            raise ValueError("NLStreamFrame JSON must be an object")
-        raw_seq = data.get("sequence", 0)
-        if type(raw_seq) is not int or raw_seq < 0:
-            raise ValueError("NLStreamFrame sequence must be a non-negative integer")
-        raw_ts = data.get("timestamp_ms", time.time() * 1000)
-        if not isinstance(raw_ts, (int, float)) or isinstance(raw_ts, bool) or not math.isfinite(float(raw_ts)):
-            raise ValueError("NLStreamFrame timestamp_ms must be a finite number")
-        raw_payload = data.get("payload", {})
-        invalid_payload = not isinstance(raw_payload, dict)
-        if invalid_payload:
-            raise ValueError("NLStreamFrame payload must be a JSON object")
-        session_id = data.get("session_id", "default")
-        if not isinstance(session_id, str) or not session_id:
-            raise ValueError("NLStreamFrame session_id must be a non-empty string")
-        return cls(
-            type=StreamFrameType(data["type"]),
-            session_id=session_id,
-            sequence=raw_seq,
-            timestamp_ms=float(raw_ts),
-            payload=raw_payload,
-        )
-
-
-def _xor_ws_mask(payload: bytes | bytearray, mask: bytes | bytearray) -> bytes:
-    """Fast vectorized RFC 6455 4-byte XOR masking/unmasking."""
-    length = len(payload)
-    if length == 0:
-        return b""
-    repeated_mask = (bytes(mask) * ((length // 4) + 1))[:length]
-    return (
-        int.from_bytes(payload, "big") ^ int.from_bytes(repeated_mask, "big")
-    ).to_bytes(length, "big")
-
-
-def make_ws_handshake_response(key: str) -> bytes:
-    """Create HTTP 101 Switching Protocols response for WebSocket upgrade."""
-    accept_src = key.strip() + WS_GUID
-    accept_val = base64.b64encode(hashlib.sha1(accept_src.encode("ascii")).digest()).decode("ascii")
-    response = (
-        "HTTP/1.1 101 Switching Protocols\r\n"
-        "Upgrade: websocket\r\n"
-        "Connection: Upgrade\r\n"
-        f"Sec-WebSocket-Accept: {accept_val}\r\n"
-        "\r\n"
-    )
-    return response.encode("ascii")
-
-
-def encode_ws_frame(
-    payload: bytes | str,
-    opcode: int = 1,
-    mask: bool = False,
-    *,
-    max_payload_bytes: int = MAX_FRAME_PAYLOAD_BYTES,
-) -> bytes:
-    """Encode an RFC 6455 WebSocket frame with bounded payload size."""
-    payload_bytes = payload.encode("utf-8") if isinstance(payload, str) else payload
-    length = len(payload_bytes)
-    if length > max_payload_bytes:
-        raise ValueError(f"WebSocket payload length {length} exceeds limit {max_payload_bytes}")
-
-    header = bytearray([0x80 | (opcode & 0x0F)])
-    mask_bit = 0x80 if mask else 0x00
-    if length < 126:
-        header.append(mask_bit | length)
-    elif length <= 0xFFFF:
-        header.append(mask_bit | 126)
-        header.extend(struct.pack("!H", length))
-    else:
-        header.append(mask_bit | 127)
-        header.extend(struct.pack("!Q", length))
-
-    if mask:
-        masking_key = os.urandom(4)
-        header.extend(masking_key)
-        return bytes(header) + _xor_ws_mask(payload_bytes, masking_key)
-
-    return bytes(header) + payload_bytes
-
-
-def decode_ws_frame(
-    buffer: bytearray, *, max_payload_bytes: int = MAX_FRAME_PAYLOAD_BYTES
-) -> tuple[int, bytes, int] | None:
-    """Decode an RFC 6455 WebSocket frame, raising ValueError if payload exceeds max_payload_bytes."""
-    if len(buffer) < 2:
-        return None
-
-    opcode = buffer[0] & 0x0F
-    is_masked = (buffer[1] & 0x80) != 0
-    payload_len = buffer[1] & 0x7F
-
-    offset = 2
-    if payload_len == 126:
-        if len(buffer) < 4:
-            return None
-        payload_len = struct.unpack("!H", buffer[2:4])[0]
-        offset = 4
-    elif payload_len == 127:
-        if len(buffer) < 10:
-            return None
-        payload_len = struct.unpack("!Q", buffer[2:10])[0]
-        offset = 10
-
-    if payload_len > max_payload_bytes:
-        raise ValueError(f"WebSocket frame payload {payload_len} exceeds max {max_payload_bytes}")
-
-    mask: bytes | None = None
-    if is_masked:
-        if len(buffer) < offset + 4:
-            return None
-        mask = bytes(buffer[offset : offset + 4])
-        offset += 4
-
-    if len(buffer) < offset + payload_len:
-        return None
-
-    raw_data = bytes(buffer[offset : offset + payload_len])
-    payload = _xor_ws_mask(raw_data, mask) if (is_masked and mask is not None) else raw_data
-    return opcode, payload, offset + payload_len
+__all__ = [
+    "MAX_CONTROL_FRAME_BYTES",
+    "MAX_FRAME_PAYLOAD_BYTES",
+    "MAX_HANDSHAKE_BYTES",
+    "MAX_JSON_DEPTH",
+    "WS_GUID",
+    "NLStreamFrame",
+    "NLStreamServer",
+    "StreamFrameType",
+    "StreamingOptionNetworkEngine",
+    "_xor_ws_mask",
+    "decode_ws_frame",
+    "encode_ws_frame",
+    "make_ws_handshake_response",
+    "parse_ws_upgrade_key",
+]
 
 
 class StreamingOptionNetworkEngine:
@@ -242,7 +106,9 @@ class StreamingOptionNetworkEngine:
             for sub_idx, sub in enumerate(node.next_options[:3]):
                 sub_id = f"node:sub_{idx}_{sub_idx}"
                 dag_nodes.append({"id": sub_id, "label": sub.display_label, "type": "param_option"})
-                dag_edges.append({"from": cand_id, "to": sub_id, "weight": round(sub.confidence, 3)})
+                dag_edges.append(
+                    {"from": cand_id, "to": sub_id, "weight": round(sub.confidence, 3)}
+                )
 
         return {
             "prefix": clean,
@@ -272,12 +138,44 @@ class NLStreamServer:
         self.server: asyncio.Server | None = None
         self.engine = StreamingOptionNetworkEngine()
         self.executor = DSLExecutor()
-        self.executor.register("ticket", "list", lambda _cmd: [{"id": "ticket-001", "title": "Example task", "status": "OPEN"}])
-        self.executor.register("ticket", "create", lambda cmd: {"id": "ticket-002", "title": cmd.arguments.get("title", "New task"), "status": "OPEN"})
-        self.executor.register("ticket", "close", lambda cmd: {"id": cmd.arguments.get("id", "ticket-001"), "status": "CLOSED"})
-        self.executor.register("service", "restart", lambda cmd: {"service": cmd.arguments.get("target", "auth-service"), "status": "restarted"})
-        self.executor.register("service", "stop", lambda cmd: {"service": cmd.arguments.get("target", "auth-service"), "status": "stopped"})
-        self.executor.register("cluster", "status", lambda _cmd: {"cluster": "ready", "env": "prod"})
+        self.executor.register(
+            "ticket",
+            "list",
+            lambda _cmd: [{"id": "ticket-001", "title": "Example task", "status": "OPEN"}],
+        )
+        self.executor.register(
+            "ticket",
+            "create",
+            lambda cmd: {
+                "id": "ticket-002",
+                "title": cmd.arguments.get("title", "New task"),
+                "status": "OPEN",
+            },
+        )
+        self.executor.register(
+            "ticket",
+            "close",
+            lambda cmd: {"id": cmd.arguments.get("id", "ticket-001"), "status": "CLOSED"},
+        )
+        self.executor.register(
+            "service",
+            "restart",
+            lambda cmd: {
+                "service": cmd.arguments.get("target", "auth-service"),
+                "status": "restarted",
+            },
+        )
+        self.executor.register(
+            "service",
+            "stop",
+            lambda cmd: {
+                "service": cmd.arguments.get("target", "auth-service"),
+                "status": "stopped",
+            },
+        )
+        self.executor.register(
+            "cluster", "status", lambda _cmd: {"cluster": "ready", "env": "prod"}
+        )
         self.bridge = NLDSLLLMBridge(executor=self.executor)
         self.active_sessions: dict[str, dict[str, Any]] = {}
         self._client_tasks: set[asyncio.Task[Any]] = set()
@@ -342,13 +240,15 @@ class NLStreamServer:
                     header_text = buffer[:header_end].decode("latin-1")
                     del buffer[: header_end + 4]
 
-                    key_match = re.search(r"Sec-WebSocket-Key:\s*([^\r\n]+)", header_text, re.IGNORECASE)
-                    if not key_match:
+                    try:
+                        ws_key = parse_ws_upgrade_key(header_text)
+                        resp_bytes = make_ws_handshake_response(ws_key)
+                    except ValueError:
                         writer.write(b"HTTP/1.1 400 Bad Request\r\n\r\n")
                         await writer.drain()
                         return
 
-                    writer.write(make_ws_handshake_response(key_match.group(1).strip()))
+                    writer.write(resp_bytes)
                     await writer.drain()
                     handshake_done = True
 
@@ -362,14 +262,16 @@ class NLStreamServer:
                         await writer.drain()
                         return
                     if opcode == 9:
-                        writer.write(encode_ws_frame(payload, opcode=10))
+                        writer.write(encode_ws_frame(payload[:MAX_CONTROL_FRAME_BYTES], opcode=10))
                         await writer.drain()
                     elif opcode in (1, 2):
                         await self._dispatch_message(session_id, payload, opcode, writer)
                     continue
 
                 if len(buffer) > self.max_frame_payload_bytes + 16:
-                    await self._send_error(writer, session_id, "ERR_FRAME_TOO_LARGE", "Frame buffer exceeded limit")
+                    await self._send_error(
+                        writer, session_id, "ERR_FRAME_TOO_LARGE", "Frame buffer exceeded limit"
+                    )
                     return
                 data = await reader.read(4096)
                 if not data:
@@ -421,7 +323,11 @@ class NLStreamServer:
                 payload={
                     "status": "ready",
                     "server": "nl-dsl-llm-ws/v1",
-                    "features": ["audio_stream", "option_network_stream", "digital_twin_projection"],
+                    "features": [
+                        "audio_stream",
+                        "option_network_stream",
+                        "digital_twin_projection",
+                    ],
                     "sla_max_latency_ms": 50.0,
                 },
             )
@@ -467,7 +373,11 @@ class NLStreamServer:
 
         elif frame_in.type == StreamFrameType.COMMAND_COMMITTED:
             raw_cmd = frame_in.payload.get("text")
-            command_text = raw_cmd if isinstance(raw_cmd, str) and raw_cmd else session.get("accumulated_text", "")
+            command_text = (
+                raw_cmd
+                if isinstance(raw_cmd, str) and raw_cmd
+                else session.get("accumulated_text", "")
+            )
             t_exec_0 = time.perf_counter()
             result: DSLResult = self.bridge.handle_request(command_text)
             exec_ms = (time.perf_counter() - t_exec_0) * 1000.0
