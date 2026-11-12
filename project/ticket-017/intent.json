@@ -1,0 +1,85 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-017",
+  "summary": "Harden Python IPC client socket framing, byte bounds, and Koru polarity guard",
+  "workstream": "interfaces",
+  "classification": {
+    "kind": "BUG",
+    "priority": "P1",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "project/ticket-017/**",
+    "project/ticket-016/README.md",
+    "TODO.md",
+    "project/TICKETS.md",
+    "clients/python/nl_dsl_client.py",
+    "clients/python/nl_dsl_ipc.py"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "c7e4c5d14efb0e6469fdd389b6e6497310f06564",
+    "targetBranch": "main",
+    "outcome": "Bound NLClient IPC socket reads to 1 MiB with strict single-line newline framing and non-finite JSON rejection, reject symlink/non-socket Unix socket paths, cache the in-memory NLRuntimeEngine fallback per client, and enforce Polish/English negation polarity and ASCII integer/ticket bounds in KoruNLClient.",
+    "nonGoals": [
+      "No breaking changes to NLClient or KoruNLClient public method signatures",
+      "No external dependencies"
+    ],
+    "complexity": "S",
+    "estimatedMinutes": 15,
+    "budgets": {
+      "maxImplementationFiles": 2,
+      "maxAffectedComponents": 1,
+      "maxPublicInterfaceChanges": 0,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Extract clients/python/nl_dsl_ipc.py (<500 lines) for bounded recv_json_line framing, is_safe_unix_socket lstat/ancestor checks, polarity helpers, and self-tests, and harden clients/python/nl_dsl_client.py (<500 lines) with cached fallback engine reuse and Koru polarity/integer/ASCII ticket guards.",
+      "components": [
+        {
+          "name": "nl-dsl-python-client",
+          "paths": [
+            "clients/python/nl_dsl_client.py",
+            "clients/python/nl_dsl_ipc.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-017 merge commit."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "python3 clients/python/nl_dsl_client.py --self-test",
+          "ruff check --no-cache clients/python/nl_dsl_client.py clients/python/nl_dsl_ipc.py"
+        ],
+        "evidence": "project/ticket-017/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "pytest -q",
+          "./project/governance-check.sh --base origin/main",
+          "wellman check"
+        ],
+        "evidence": "project/ticket-017/README.md"
+      }
+    ]
+  }
+}
