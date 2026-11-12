@@ -5,8 +5,12 @@ Maps semantic action_id to executable procedure URIs across clients (Taskand, Cl
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
+
+_SAFE_OP_ID_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 @dataclass
@@ -14,26 +18,26 @@ class ActionDef:
     action_id: str
     title: str
     description: str
-    aliases_pl: List[str] = field(default_factory=list)
-    aliases_en: List[str] = field(default_factory=list)
-    uri_patterns: Dict[str, str] = field(default_factory=dict)  # client_id -> URI
-    handler: Optional[Callable[[Dict[str, Any]], Any]] = None
+    aliases_pl: list[str] = field(default_factory=list)
+    aliases_en: list[str] = field(default_factory=list)
+    uri_patterns: dict[str, str] = field(default_factory=dict)  # client_id -> URI
+    handler: Callable[[dict[str, Any]], Any] | None = None
 
 
 class ProcedureRegistry:
     """Central catalog of known actions and client-specific URI mappings."""
 
     def __init__(self):
-        self._actions: Dict[str, ActionDef] = {}
+        self._actions: dict[str, ActionDef] = {}
         self._register_default_catalog()
 
     def register(self, action: ActionDef) -> None:
         self._actions[action.action_id] = action
 
-    def get(self, action_id: str) -> Optional[ActionDef]:
+    def get(self, action_id: str) -> ActionDef | None:
         return self._actions.get(action_id)
 
-    def list_actions(self) -> List[ActionDef]:
+    def list_actions(self) -> list[ActionDef]:
         return list(self._actions.values())
 
     def resolve_uri(self, action_id: str, client_id: str, default: str = "") -> str:
@@ -42,297 +46,407 @@ class ProcedureRegistry:
             return default
         return act.uri_patterns.get(client_id, act.uri_patterns.get("default", default))
 
-    def import_openapi_schema(self, schema_dict: Dict[str, Any], client_id: str = "openapi") -> int:
+    def import_openapi_schema(
+        self, schema_dict: dict[str, Any], client_id: str = "openapi"
+    ) -> int:
         """
         Federated schema discovery: imports OpenAPI v3 path operations into ProcedureRegistry.
         """
-        paths = schema_dict.get("paths", {})
+        if (
+            not isinstance(schema_dict, dict)
+            or not isinstance(client_id, str)
+            or not client_id.strip()
+        ):
+            return 0
+        paths = schema_dict.get("paths")
+        if not isinstance(paths, dict):
+            return 0
         count = 0
         for path, methods in paths.items():
-            if not isinstance(methods, dict):
+            if (
+                not isinstance(path, str)
+                or not path.startswith("/")
+                or ".." in path
+                or any(ord(ch) <= 0x20 or ord(ch) == 0x7F for ch in path)
+                or not isinstance(methods, dict)
+            ):
                 continue
             for method, op_def in methods.items():
-                if method.lower() not in ("get", "post", "put", "delete", "patch") or not isinstance(op_def, dict):
+                if (
+                    not isinstance(method, str)
+                    or method.lower() not in ("get", "post", "put", "delete", "patch")
+                    or not isinstance(op_def, dict)
+                ):
                     continue
-                op_id = op_def.get("operationId") or f"{method.lower()}_{path.replace('/', '_').strip('_')}"
-                summary = op_def.get("summary") or op_id
+                raw_op = op_def.get("operationId")
+                fallback_op = f"{method.lower()}_{path.replace('/', '_').strip('_')}"
+                candidate_op = (
+                    raw_op
+                    if isinstance(raw_op, str) and raw_op.strip()
+                    else fallback_op
+                )
+                op_id = _SAFE_OP_ID_RE.sub("_", candidate_op).strip("_.")
+                if not op_id or ".." in op_id:
+                    continue
+                raw_summary = op_def.get("summary")
+                summary = (
+                    raw_summary.strip()
+                    if isinstance(raw_summary, str) and raw_summary.strip()
+                    else op_id
+                )
+                raw_desc = op_def.get("description")
+                description = (
+                    raw_desc.strip()
+                    if isinstance(raw_desc, str) and raw_desc.strip()
+                    else summary
+                )
                 action_id = f"api.{op_id}"
-                self.register(ActionDef(
-                    action_id=action_id,
-                    title=summary,
-                    description=op_def.get("description", summary),
-                    aliases_pl=[summary.lower()],
-                    aliases_en=[op_id.replace("_", " ")],
-                    uri_patterns={client_id: f"openapi://{path}#{method.upper()}", "default": f"proc://api/{op_id}/v1"}
-                ))
+                self.register(
+                    ActionDef(
+                        action_id=action_id,
+                        title=summary,
+                        description=description,
+                        aliases_pl=[summary.lower()],
+                        aliases_en=[op_id.replace("_", " ")],
+                        uri_patterns={
+                            client_id: f"openapi://{path}#{method.upper()}",
+                            "default": f"proc://api/{op_id}/v1",
+                        },
+                    )
+                )
                 count += 1
         return count
 
     def _register_default_catalog(self) -> None:
         # 1. CPU Monitor
-        self.register(ActionDef(
-            action_id="monitor.cpu_status",
-            title="CPU Usage Status",
-            description="Check CPU core usage and load average",
-            aliases_pl=["pokaż procesor", "status cpu", "użycie procesora", "obciążenie cpu"],
-            aliases_en=["cpu status", "show cpu", "cpu usage", "check load"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/monitor/cpu/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:sys:cpu-check",
-                "clonerd": "cluster.node.cpu",
-                "default": "proc://paxlet.com/monitor/cpu/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="monitor.cpu_status",
+                title="CPU Usage Status",
+                description="Check CPU core usage and load average",
+                aliases_pl=[
+                    "pokaż procesor",
+                    "status cpu",
+                    "użycie procesora",
+                    "obciążenie cpu",
+                ],
+                aliases_en=["cpu status", "show cpu", "cpu usage", "check load"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/monitor/cpu/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:sys:cpu-check",
+                    "clonerd": "cluster.node.cpu",
+                    "default": "proc://paxlet.com/monitor/cpu/v1",
+                },
+            )
+        )
 
         # 2. Memory / RAM Monitor
-        self.register(ActionDef(
-            action_id="monitor.memory_status",
-            title="Memory Status",
-            description="Check RAM allocation, free memory and swap usage",
-            aliases_pl=["status ram", "pokaż pamięć", "użycie ram", "ile wolnego ramu"],
-            aliases_en=["ram status", "memory usage", "free memory", "check swap"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/monitor/memory/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:sys:ram-check",
-                "clonerd": "cluster.node.memory",
-                "default": "proc://paxlet.com/monitor/memory/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="monitor.memory_status",
+                title="Memory Status",
+                description="Check RAM allocation, free memory and swap usage",
+                aliases_pl=[
+                    "status ram",
+                    "pokaż pamięć",
+                    "użycie ram",
+                    "ile wolnego ramu",
+                ],
+                aliases_en=["ram status", "memory usage", "free memory", "check swap"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/monitor/memory/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:sys:ram-check",
+                    "clonerd": "cluster.node.memory",
+                    "default": "proc://paxlet.com/monitor/memory/v1",
+                },
+            )
+        )
 
         # 3. Service Restart
-        self.register(ActionDef(
-            action_id="service.restart",
-            title="Restart Service",
-            description="Restart a designated daemon or container service",
-            aliases_pl=["zrestartuj usługę", "restartuj serwis", "zresetuj kontener"],
-            aliases_en=["restart service", "reboot daemon", "restart container"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/service/restart/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:service:restart",
-                "clonerd": "cluster.service.restart",
-                "default": "proc://paxlet.com/service/restart/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="service.restart",
+                title="Restart Service",
+                description="Restart a designated daemon or container service",
+                aliases_pl=[
+                    "zrestartuj usługę",
+                    "restartuj serwis",
+                    "zresetuj kontener",
+                ],
+                aliases_en=["restart service", "reboot daemon", "restart container"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/service/restart/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:service:restart",
+                    "clonerd": "cluster.service.restart",
+                    "default": "proc://paxlet.com/service/restart/v1",
+                },
+            )
+        )
 
         # 4. Task / Ticket List
-        self.register(ActionDef(
-            action_id="task.list",
-            title="List Tasks",
-            description="Query and filter tasks by status or assigned workstream",
-            aliases_pl=["pokaż zadania", "wypisz zadania", "lista ticketów", "pokaż tickety"],
-            aliases_en=["list tasks", "show tickets", "get tasks", "query tickets"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/task/list/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:task:list",
-                "clonerd": "cluster.task.list",
-                "default": "proc://paxlet.com/task/list/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="task.list",
+                title="List Tasks",
+                description="Query and filter tasks by status or assigned workstream",
+                aliases_pl=[
+                    "pokaż zadania",
+                    "wypisz zadania",
+                    "lista ticketów",
+                    "pokaż tickety",
+                ],
+                aliases_en=["list tasks", "show tickets", "get tasks", "query tickets"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/task/list/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:task:list",
+                    "clonerd": "cluster.task.list",
+                    "default": "proc://paxlet.com/task/list/v1",
+                },
+            )
+        )
 
         # 5. Clean Cache
-        self.register(ActionDef(
-            action_id="cache.cleanup",
-            title="Clean Cache",
-            description="Purge temporary files and cache stores",
-            aliases_pl=["wyczyść cache", "usuń pamięć podręczną", "wyczyść pamięć podręczną"],
-            aliases_en=["clear cache", "clean cache", "purge cache", "flush cache"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/cache/clean/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:cache:purge",
-                "clonerd": "cluster.cache.clean",
-                "koru": "proc://koru.dev/cache/clean/v1",
-                "default": "proc://paxlet.com/cache/clean/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="cache.cleanup",
+                title="Clean Cache",
+                description="Purge temporary files and cache stores",
+                aliases_pl=[
+                    "wyczyść cache",
+                    "usuń pamięć podręczną",
+                    "wyczyść pamięć podręczną",
+                ],
+                aliases_en=["clear cache", "clean cache", "purge cache", "flush cache"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/cache/clean/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:cache:purge",
+                    "clonerd": "cluster.cache.clean",
+                    "koru": "proc://koru.dev/cache/clean/v1",
+                    "default": "proc://paxlet.com/cache/clean/v1",
+                },
+            )
+        )
 
         # 6. Task Schedule
-        self.register(ActionDef(
-            action_id="task.schedule",
-            title="Schedule Task",
-            description="Schedule or enqueue an automated task or plan",
-            aliases_pl=["zaplanuj zadanie", "harmonogram", "kolejkuj"],
-            aliases_en=["schedule task", "plan task", "enqueue task"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/planner/schedule/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:task:schedule",
-                "clonerd": "cluster.task.schedule",
-                "koru": "proc://koru.dev/task/schedule/v1",
-                "default": "proc://paxlet.com/task/schedule/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="task.schedule",
+                title="Schedule Task",
+                description="Schedule or enqueue an automated task or plan",
+                aliases_pl=["zaplanuj zadanie", "harmonogram", "kolejkuj"],
+                aliases_en=["schedule task", "plan task", "enqueue task"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/planner/schedule/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:task:schedule",
+                    "clonerd": "cluster.task.schedule",
+                    "koru": "proc://koru.dev/task/schedule/v1",
+                    "default": "proc://paxlet.com/task/schedule/v1",
+                },
+            )
+        )
 
         # 7. Task Get
-        self.register(ActionDef(
-            action_id="task.get",
-            title="Get Task Details",
-            description="Inspect details, history and evidence of a specific task",
-            aliases_pl=["szczegóły zadania", "pokaż zadanie", "dane zadania"],
-            aliases_en=["task details", "inspect task", "show task details"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/task/get/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:task:get",
-                "clonerd": "cluster.task.get",
-                "koru": "proc://koru.dev/task/get/v1",
-                "default": "proc://paxlet.com/task/get/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="task.get",
+                title="Get Task Details",
+                description="Inspect details, history and evidence of a specific task",
+                aliases_pl=["szczegóły zadania", "pokaż zadanie", "dane zadania"],
+                aliases_en=["task details", "inspect task", "show task details"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/task/get/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:task:get",
+                    "clonerd": "cluster.task.get",
+                    "koru": "proc://koru.dev/task/get/v1",
+                    "default": "proc://paxlet.com/task/get/v1",
+                },
+            )
+        )
 
         # 8. Task Create
-        self.register(ActionDef(
-            action_id="task.create",
-            title="Create Task",
-            description="Create or initialize a new task or ticket",
-            aliases_pl=["utwórz zadanie", "nowe zadanie", "dodaj zadanie"],
-            aliases_en=["create task", "new task", "add ticket"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/task/create/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:task:create",
-                "clonerd": "cluster.task.create",
-                "koru": "proc://koru.dev/task/create/v1",
-                "default": "proc://paxlet.com/task/create/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="task.create",
+                title="Create Task",
+                description="Create or initialize a new task or ticket",
+                aliases_pl=["utwórz zadanie", "nowe zadanie", "dodaj zadanie"],
+                aliases_en=["create task", "new task", "add ticket"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/task/create/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:task:create",
+                    "clonerd": "cluster.task.create",
+                    "koru": "proc://koru.dev/task/create/v1",
+                    "default": "proc://paxlet.com/task/create/v1",
+                },
+            )
+        )
 
         # 9. Task Close
-        self.register(ActionDef(
-            action_id="task.close",
-            title="Close Task",
-            description="Mark a completed task as done or closed",
-            aliases_pl=["zamknij zadanie", "zakończ zadanie", "oznacz jako zrobione"],
-            aliases_en=["close task", "complete task", "finish task"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/task/close/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:task:close",
-                "clonerd": "cluster.task.close",
-                "koru": "proc://koru.dev/task/close/v1",
-                "default": "proc://paxlet.com/task/close/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="task.close",
+                title="Close Task",
+                description="Mark a completed task as done or closed",
+                aliases_pl=[
+                    "zamknij zadanie",
+                    "zakończ zadanie",
+                    "oznacz jako zrobione",
+                ],
+                aliases_en=["close task", "complete task", "finish task"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/task/close/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:task:close",
+                    "clonerd": "cluster.task.close",
+                    "koru": "proc://koru.dev/task/close/v1",
+                    "default": "proc://paxlet.com/task/close/v1",
+                },
+            )
+        )
 
         # 10. Worktree Allocate
-        self.register(ActionDef(
-            action_id="worktree.allocate",
-            title="Allocate Git Worktree",
-            description="Allocate an isolated Git worktree for parallel ticket delivery",
-            aliases_pl=["alokuj worktree", "utwórz gałąź", "nowe worktree"],
-            aliases_en=["allocate worktree", "create branch", "new worktree"],
-            uri_patterns={
-                "clonerd": "cluster.worktree.allocate",
-                "taskand": "proc://taskand.dev/worktree/allocate/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:worktree:allocate",
-                "koru": "proc://koru.dev/worktree/allocate/v1",
-                "default": "cluster.worktree.allocate"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="worktree.allocate",
+                title="Allocate Git Worktree",
+                description="Allocate an isolated Git worktree for parallel ticket delivery",
+                aliases_pl=["alokuj worktree", "utwórz gałąź", "nowe worktree"],
+                aliases_en=["allocate worktree", "create branch", "new worktree"],
+                uri_patterns={
+                    "clonerd": "cluster.worktree.allocate",
+                    "taskand": "proc://taskand.dev/worktree/allocate/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:worktree:allocate",
+                    "koru": "proc://koru.dev/worktree/allocate/v1",
+                    "default": "cluster.worktree.allocate",
+                },
+            )
+        )
 
         # 11. Koru Doctor
-        self.register(ActionDef(
-            action_id="koru.doctor",
-            title="Koru Doctor Diagnosis",
-            description="Autonomous health diagnosis and self-healing verification",
-            aliases_pl=["koru doctor", "napraw środowisko", "diagnostyka"],
-            aliases_en=["doctor diagnose", "repair environment", "health check"],
-            uri_patterns={
-                "koru": "proc://koru.dev/doctor/diagnose/v1",
-                "taskand": "proc://taskand.dev/doctor/diagnose/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:koru:doctor",
-                "clonerd": "cluster.node.repair",
-                "default": "proc://koru.dev/doctor/diagnose/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="koru.doctor",
+                title="Koru Doctor Diagnosis",
+                description="Autonomous health diagnosis and self-healing verification",
+                aliases_pl=["koru doctor", "napraw środowisko", "diagnostyka"],
+                aliases_en=["doctor diagnose", "repair environment", "health check"],
+                uri_patterns={
+                    "koru": "proc://koru.dev/doctor/diagnose/v1",
+                    "taskand": "proc://taskand.dev/doctor/diagnose/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:koru:doctor",
+                    "clonerd": "cluster.node.repair",
+                    "default": "proc://koru.dev/doctor/diagnose/v1",
+                },
+            )
+        )
 
         # 12. Koru Queue Next
-        self.register(ActionDef(
-            action_id="koru.queue.next",
-            title="Koru Pop Next Task",
-            description="Dispatch and execute next queued autonomous task",
-            aliases_pl=["następne zadanie", "pobierz z kolejki", "kolejny krok"],
-            aliases_en=["next task", "pop queue", "run next"],
-            uri_patterns={
-                "koru": "proc://koru.dev/queue/pop/v1",
-                "taskand": "proc://taskand.dev/queue/pop/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:queue:pop",
-                "clonerd": "cluster.queue.pop",
-                "default": "proc://koru.dev/queue/pop/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="koru.queue.next",
+                title="Koru Pop Next Task",
+                description="Dispatch and execute next queued autonomous task",
+                aliases_pl=["następne zadanie", "pobierz z kolejki", "kolejny krok"],
+                aliases_en=["next task", "pop queue", "run next"],
+                uri_patterns={
+                    "koru": "proc://koru.dev/queue/pop/v1",
+                    "taskand": "proc://taskand.dev/queue/pop/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:queue:pop",
+                    "clonerd": "cluster.queue.pop",
+                    "default": "proc://koru.dev/queue/pop/v1",
+                },
+            )
+        )
 
         # 13. Koru Queue Loop
-        self.register(ActionDef(
-            action_id="koru.queue.loop",
-            title="Koru Queue Continuous Loop",
-            description="Start autonomous continuous queue processing loop",
-            aliases_pl=["pętla zadań", "ciągłe przetwarzanie", "automatyzacja"],
-            aliases_en=["queue loop", "run loop", "continuous process"],
-            uri_patterns={
-                "koru": "proc://koru.dev/queue/loop/v1",
-                "taskand": "proc://taskand.dev/queue/loop/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:queue:loop",
-                "clonerd": "cluster.queue.loop",
-                "default": "proc://koru.dev/queue/loop/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="koru.queue.loop",
+                title="Koru Queue Continuous Loop",
+                description="Start autonomous continuous queue processing loop",
+                aliases_pl=["pętla zadań", "ciągłe przetwarzanie", "automatyzacja"],
+                aliases_en=["queue loop", "run loop", "continuous process"],
+                uri_patterns={
+                    "koru": "proc://koru.dev/queue/loop/v1",
+                    "taskand": "proc://taskand.dev/queue/loop/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:queue:loop",
+                    "clonerd": "cluster.queue.loop",
+                    "default": "proc://koru.dev/queue/loop/v1",
+                },
+            )
+        )
 
         # 14. Koru Context
-        self.register(ActionDef(
-            action_id="koru.context",
-            title="Koru Session Context",
-            description="Fetch session context, project briefs, and environment twin",
-            aliases_pl=["kontekst sesji", "stan projektu", "brief projektu"],
-            aliases_en=["session context", "project brief", "context snapshot"],
-            uri_patterns={
-                "koru": "proc://koru.dev/session/context/v1",
-                "taskand": "proc://taskand.dev/session/context/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:session:context",
-                "clonerd": "cluster.session.context",
-                "default": "proc://koru.dev/session/context/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="koru.context",
+                title="Koru Session Context",
+                description="Fetch session context, project briefs, and environment twin",
+                aliases_pl=["kontekst sesji", "stan projektu", "brief projektu"],
+                aliases_en=["session context", "project brief", "context snapshot"],
+                uri_patterns={
+                    "koru": "proc://koru.dev/session/context/v1",
+                    "taskand": "proc://taskand.dev/session/context/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:session:context",
+                    "clonerd": "cluster.session.context",
+                    "default": "proc://koru.dev/session/context/v1",
+                },
+            )
+        )
 
         # 15. Pull Request List
-        self.register(ActionDef(
-            action_id="pr.list",
-            title="List Pull Requests",
-            description="List and filter pull requests by review and merge status",
-            aliases_pl=["pokaż pr", "lista pull requestów", "otwarte pr"],
-            aliases_en=["list prs", "show pull requests", "open prs"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/pr/list/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:pr:list",
-                "clonerd": "cluster.pr.list",
-                "koru": "proc://koru.dev/pr/list/v1",
-                "default": "proc://paxlet.com/pr/list/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="pr.list",
+                title="List Pull Requests",
+                description="List and filter pull requests by review and merge status",
+                aliases_pl=["pokaż pr", "lista pull requestów", "otwarte pr"],
+                aliases_en=["list prs", "show pull requests", "open prs"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/pr/list/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:pr:list",
+                    "clonerd": "cluster.pr.list",
+                    "koru": "proc://koru.dev/pr/list/v1",
+                    "default": "proc://paxlet.com/pr/list/v1",
+                },
+            )
+        )
 
         # 16. Token Quota & Usage
-        self.register(ActionDef(
-            action_id="token.list",
-            title="Token Usage Summary",
-            description="Check token quota, consumption and LLM costs",
-            aliases_pl=["zużycie tokenów", "statystyki tokenów", "stan konta tokenów"],
-            aliases_en=["token usage", "token stats", "quota usage"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/token/list/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:token:list",
-                "clonerd": "cluster.token.list",
-                "koru": "proc://koru.dev/token/list/v1",
-                "default": "proc://paxlet.com/token/list/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="token.list",
+                title="Token Usage Summary",
+                description="Check token quota, consumption and LLM costs",
+                aliases_pl=[
+                    "zużycie tokenów",
+                    "statystyki tokenów",
+                    "stan konta tokenów",
+                ],
+                aliases_en=["token usage", "token stats", "quota usage"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/token/list/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:token:list",
+                    "clonerd": "cluster.token.list",
+                    "koru": "proc://koru.dev/token/list/v1",
+                    "default": "proc://paxlet.com/token/list/v1",
+                },
+            )
+        )
 
         # 17. Process / Agent List
-        self.register(ActionDef(
-            action_id="process.list",
-            title="List Running Processes",
-            description="List active background agents and daemon processes",
-            aliases_pl=["lista procesów", "działające agenty", "procesy w tle"],
-            aliases_en=["list processes", "running agents", "background processes"],
-            uri_patterns={
-                "taskand": "proc://taskand.dev/process/list/v1",
-                "nl-dsl-sh": "urn:nl-dsl-sh:process:list",
-                "clonerd": "cluster.process.list",
-                "koru": "proc://koru.dev/process/list/v1",
-                "default": "proc://paxlet.com/process/list/v1"
-            }
-        ))
+        self.register(
+            ActionDef(
+                action_id="process.list",
+                title="List Running Processes",
+                description="List active background agents and daemon processes",
+                aliases_pl=["lista procesów", "działające agenty", "procesy w tle"],
+                aliases_en=["list processes", "running agents", "background processes"],
+                uri_patterns={
+                    "taskand": "proc://taskand.dev/process/list/v1",
+                    "nl-dsl-sh": "urn:nl-dsl-sh:process:list",
+                    "clonerd": "cluster.process.list",
+                    "koru": "proc://koru.dev/process/list/v1",
+                    "default": "proc://paxlet.com/process/list/v1",
+                },
+            )
+        )

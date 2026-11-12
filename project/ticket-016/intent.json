@@ -1,0 +1,109 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-016",
+  "summary": "Fix paxlet_nl_dsl_llm json import, restore tests suite in pytest, and harden layers, registry, and server",
+  "workstream": "integration",
+  "classification": {
+    "kind": "BUG",
+    "priority": "P1",
+    "origin": "health"
+  },
+  "allowedPaths": [
+    "project/ticket-016/**",
+    "project/ticket-013/README.md",
+    "project/ticket-014/README.md",
+    "project/ticket-015/README.md",
+    "TODO.md",
+    "project/TICKETS.md",
+    "pyproject.toml",
+    "src/paxlet_nl_dsl_llm/layers.py",
+    "src/paxlet_nl_dsl_llm/layers_compiler.py",
+    "src/paxlet_nl_dsl_llm/model_profiles.py",
+    "src/paxlet_nl_dsl_llm/registry.py",
+    "src/paxlet_nl_dsl_llm/server.py",
+    "tests/test_suite.py"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "a81bbcf1625568f163b45c537670193a06233f6e",
+    "targetBranch": "main",
+    "outcome": "Fix missing json import in src/paxlet_nl_dsl_llm/layers.py, restore tests/ in pyproject.toml testpaths, optimize damerau_levenshtein and bound SemanticCache/slot parsing, unify negation guard across LLMCompiler, harden OpenAPI schema import and NLRuntimeEngine.execute/benchmark_matrix, and keep all modules under 500 lines.",
+    "nonGoals": [
+      "No breaking changes to existing RPC/CLI response envelopes",
+      "No new external runtime dependencies"
+    ],
+    "complexity": "M",
+    "estimatedMinutes": 25,
+    "budgets": {
+      "maxImplementationFiles": 7,
+      "maxAffectedComponents": 2,
+      "maxPublicInterfaceChanges": 0,
+      "maxRuntimeDependencies": 0
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Extract model_profiles.py (<500 lines), share NEGATION_PATTERN and MAX_QUERY_CHARS between layers_compiler.py and layers.py, bound Damerau-Levenshtein and SemanticCache memory/digit limits, harden registry OpenAPI sanitization and server execution/benchmark edges, and include tests/ in pyproject.toml pytest testpaths.",
+      "components": [
+        {
+          "name": "paxlet-nl-dsl-llm-runtime",
+          "paths": [
+            "src/paxlet_nl_dsl_llm/layers.py",
+            "src/paxlet_nl_dsl_llm/layers_compiler.py",
+            "src/paxlet_nl_dsl_llm/model_profiles.py",
+            "src/paxlet_nl_dsl_llm/registry.py",
+            "src/paxlet_nl_dsl_llm/server.py"
+          ]
+        },
+        {
+          "name": "pytest-config-and-runtime-suite",
+          "paths": [
+            "pyproject.toml",
+            "tests/test_suite.py"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Revert the ticket-016 merge commit."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-01",
+        "commands": [
+          "pytest -q",
+          "python3 -B -m pytest -o pythonpath=. -p no:cacheprovider"
+        ],
+        "evidence": "project/ticket-016/README.md"
+      },
+      {
+        "criterion": "AC-02",
+        "commands": [
+          "ruff check --no-cache src/paxlet_nl_dsl_llm/layers.py src/paxlet_nl_dsl_llm/layers_compiler.py src/paxlet_nl_dsl_llm/model_profiles.py src/paxlet_nl_dsl_llm/registry.py src/paxlet_nl_dsl_llm/server.py tests/test_suite.py"
+        ],
+        "evidence": "project/ticket-016/README.md"
+      },
+      {
+        "criterion": "AC-03",
+        "commands": [
+          "python3 standard/nl_dsl_llm.py --self-test",
+          "./project/governance-check.sh --base origin/main",
+          "wellman check"
+        ],
+        "evidence": "project/ticket-016/README.md"
+      }
+    ]
+  }
+}

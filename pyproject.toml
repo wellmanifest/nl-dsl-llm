@@ -38,7 +38,7 @@ adopts = [
 
 [tool.pytest.ini_options]
 addopts = "-p wellmanifest_governance"
-testpaths = ["standard"]
+testpaths = ["standard", "tests"]
 python_files = ["test_*.py"]
 pythonpath = [".", "src"]
 cache_dir = ".subactor/cache/pytest"
