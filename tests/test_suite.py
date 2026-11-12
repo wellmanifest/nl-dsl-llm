@@ -2,14 +2,24 @@
 Complete test suite for paxlet-com/nl-dsl-llm.
 """
 
+import sys
+from pathlib import Path
+
+_SRC_DIR = str(Path(__file__).resolve().parents[1] / "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
 from paxlet_nl_dsl_llm.layers import (
+    MODEL_PROFILES,
     DigitalTwinContext,
     DigitalTwinPromptSummarizer,
     FastPathParser,
-    MODEL_PROFILES,
+    LLMCompiler,
     SemanticCache,
     SingleResidentModelManager,
+    damerau_levenshtein,
 )
+from paxlet_nl_dsl_llm.registry import ActionDef
 from paxlet_nl_dsl_llm.server import NLRuntimeEngine
 
 
@@ -48,7 +58,7 @@ def test_digital_twin_prompt_summarizer():
     twin = DigitalTwinContext(
         environment="prod",
         active_services=["postgres", "redis-cache", "worker"],
-        degraded_services=["redis-cache"]
+        degraded_services=["redis-cache"],
     )
     summary = summarizer.summarize(twin, query="restart")
     assert summary["has_degraded"] is True
@@ -166,19 +176,21 @@ def test_federated_openapi_import():
                 "get": {
                     "operationId": "list_nodes",
                     "summary": "Pokaż listę węzłów klastra",
-                    "description": "Returns active cluster compute nodes"
+                    "description": "Returns active cluster compute nodes",
                 }
             },
             "/api/v1/cache/flush": {
                 "post": {
                     "operationId": "flush_cache",
                     "summary": "Wyczyść cache klastra",
-                    "description": "Purges distributed cluster cache"
+                    "description": "Purges distributed cluster cache",
                 }
-            }
-        }
+            },
+        },
     }
-    imported_count = engine.registry.import_openapi_schema(sample_openapi, client_id="cluster_api")
+    imported_count = engine.registry.import_openapi_schema(
+        sample_openapi, client_id="cluster_api"
+    )
     assert imported_count == 2
     act = engine.registry.get("api.list_nodes")
     assert act is not None
@@ -212,8 +224,13 @@ def test_single_word_queries_across_all_commands():
     for expected_action, words in test_cases:
         for word in words:
             res = engine.interpret(word, client_id="taskand")
-            assert res["action_id"] == expected_action, f"Failed for single-word '{word}': got {res['action_id']}"
-            assert res["matched_layer"] in ("SOURCE_LAYER_FAST_PATH_REGEX", "SOURCE_LAYER_FAST_PATH_TYPO_TOLERANT")
+            assert res["action_id"] == expected_action, (
+                f"Failed for single-word '{word}': got {res['action_id']}"
+            )
+            assert res["matched_layer"] in (
+                "SOURCE_LAYER_FAST_PATH_REGEX",
+                "SOURCE_LAYER_FAST_PATH_TYPO_TOLERANT",
+            )
             assert len(res["resolved_procedure_uri"]) > 0
 
 
@@ -239,16 +256,88 @@ def test_acoustic_and_keyboard_typo_tolerance():
     ]
     for noisy_input, expected_action in typos_and_acoustic_cases:
         res = engine.interpret(noisy_input)
-        assert res["action_id"] == expected_action, f"Typo '{noisy_input}' failed: got {res['action_id']}"
+        assert res["action_id"] == expected_action, (
+            f"Typo '{noisy_input}' failed: got {res['action_id']}"
+        )
         assert res["matched_layer"] == "SOURCE_LAYER_FAST_PATH_TYPO_TOLERANT"
         assert res["confidence"] >= 0.90
         assert res["status"] == "MATCHED"
 
 
 def test_ticket_008_all_modules_under_500_lines():
-    from pathlib import Path
-    pkg_dir = Path(__file__).resolve().parent.parent / "src" / "paxlet_nl_dsl_llm"
-    for path in sorted(pkg_dir.glob("*.py")):
-        lines = len(path.read_text(encoding="utf-8").splitlines())
-        assert lines <= 500, f"{path.name} has {lines} lines (> 500)"
+    root_dir = Path(__file__).resolve().parent.parent
+    for sub in ("src/paxlet_nl_dsl_llm", "standard", "tests"):
+        for path in sorted((root_dir / sub).glob("*.py")):
+            lines = len(path.read_text(encoding="utf-8").splitlines())
+            assert lines < 500, f"{sub}/{path.name} has {lines} lines (>= 500)"
 
+
+def test_ticket_016_runtime_hardening_polarity_bounds_and_handlers():
+    parser = FastPathParser()
+    assert parser.parse("a" * 5000) is None
+    assert parser.parse(None) is None  # type: ignore[arg-type]
+    assert damerau_levenshtein("restart", "resyart", max_dist=2) == 1
+    assert damerau_levenshtein("restart", "completely_different_token", max_dist=2) > 2
+
+    cache = SemanticCache(max_entries=5)
+    huge_digits = "9" * 5000
+    assert "count" not in cache.extract_slots(f"pokaż {huge_digits} zadań")
+    assert cache.promote("not-a-dict", "task.list", arguments=["bad"]) is False  # type: ignore[arg-type]
+    for idx in range(10):
+        assert cache.promote(f"custom query number {idx}", f"custom.act_{idx}") is True
+    assert len(cache._entries) == 5
+
+    compiler = LLMCompiler()
+    for negated in (
+        "nie czyść cache",
+        "don't clean cache",
+        "nigdy nie restartuj serwisu",
+        "without cache",
+    ):
+        compiled = compiler.compile(negated)
+        assert compiled.status == "clarify", negated
+        assert compiled.action_id == "", negated
+
+    engine = NLRuntimeEngine()
+    assert engine.interpret("")["status"] == "UNSUPPORTED"
+    assert engine.interpret("x" * 5000)["status"] == "UNSUPPORTED"
+    empty_bench = engine.benchmark_matrix("status ram", profile_ids=[])
+    assert empty_bench["fastest_profile"] is None
+    unknown_bench = engine.benchmark_matrix("status ram", profile_ids=["nonexistent"])
+    assert unknown_bench["fastest_profile"] is None
+
+    bad_exec = engine.execute("monitor.cpu_status", ["not-a-dict"])  # type: ignore[arg-type]
+    assert bad_exec["success"] is False
+    assert bad_exec["status_code"] == "INVALID_ARGUMENTS"
+
+    engine.registry.register(
+        ActionDef(
+            action_id="custom.echo",
+            title="Custom Echo",
+            description="Echo handler",
+            handler=lambda args: {"echoed": args.get("msg", "")},
+        )
+    )
+    dry_res = engine.execute("custom.echo", {"msg": "hi"}, dry_run=True)
+    assert dry_res["status_code"] == "DRY_RUN_OK"
+    assert "result" not in dry_res["data"]
+    live_res = engine.execute("custom.echo", {"msg": "hi"}, dry_run=False)
+    assert live_res["status_code"] == "OK"
+    assert live_res["data"]["result"] == {"echoed": "hi"}
+
+    assert engine.registry.import_openapi_schema(None) == 0  # type: ignore[arg-type]
+    assert engine.registry.import_openapi_schema({"paths": []}) == 0
+    imported = engine.registry.import_openapi_schema(
+        {
+            "paths": {
+                "/../escape": {"get": {"operationId": "bad"}},
+                "/api/v1/items": {
+                    "get": {"operationId": "list items / v1", "summary": 123}
+                },
+            }
+        }
+    )
+    assert imported == 1
+    sanitized = engine.registry.get("api.list_items_v1")
+    assert sanitized is not None
+    assert " " not in sanitized.uri_patterns["default"]
