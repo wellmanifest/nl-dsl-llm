@@ -29,8 +29,8 @@ inference = [
 ]
 
 [tool.wellmanifest]
-standard = "0.20.32"
-revision = "b6ba9c21a65a6a5648ecf904b64c3b75295e136f"
+standard = "0.20.151"
+revision = "7ac3106162c9e7a9761b4ae6726511eb8935f87a"
 gate = "project/governance-check.sh"
 adopts = [
     "wellmanifest/nl-dsl-llm@0.1.0",

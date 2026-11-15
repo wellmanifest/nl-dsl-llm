@@ -12,34 +12,46 @@
   "adoptions": [
     {
       "id": "wellmanifest/new-project",
-      "version": "0.20.29",
-      "revision": "a4178b9cf6fa12540ee7406d7f38391dd4fa1f30",
+      "version": "0.20.151",
+      "revision": "7ac3106162c9e7a9761b4ae6726511eb8935f87a",
       "model": "local-conformance",
       "level": "S2",
       "artifacts": [
         {
           "target": ".aider.conf.yml",
-          "sha256": "756af4477d7a0d39361919c957ee954807259f15cabf4dcabde81677eac6efd6"
+          "sha256": "6de9c74f752e8a879419698531ac575a1f2a3b93efd38a257ac1c48682a26bdd"
         },
         {
           "target": ".cursor/rules/new-project-standard.mdc",
-          "sha256": "72699a5cb3718be9a50603eda9c8a6d960f21b1949fdfe2b35013385b22f9afe"
+          "sha256": "8884003b3a4470e4677ca5128645f466021432ceb3f018a9f1aa743210f4181d"
+        },
+        {
+          "target": ".githooks/commit-msg",
+          "sha256": "df3e39f98bfebf971392a66b643163145872ff474d4d7cb01c6e05ed4ceb4199"
         },
         {
           "target": ".githooks/pre-commit",
-          "sha256": "bde7345b3a1a726eaf6dfd18403a8e917c0544ddfb929e4f8f10c39e58eb8a0f"
+          "sha256": "47d78f969c68d73715424cf40b0cbbb69a4af80c16c8061f2c332573db5e528f"
+        },
+        {
+          "target": ".githooks/pre-push",
+          "sha256": "e60a8cfc468c3d3c316e63b5b6f626416716abc718fa221fc2db7ec0a967ef00"
         },
         {
           "target": ".github/copilot-instructions.md",
-          "sha256": "b31f9ba957ce108a83851f48f8dbff8b4301d1c744a77fe76914e6bb8499aca3"
+          "sha256": "08330b67c95c3c175573fe1bec06c21a2f49e6c419164d04980d4f81b4efb8a8"
+        },
+        {
+          "target": ".github/workflows/new-project-branch-hygiene.yml",
+          "sha256": "e51a2dd4b60e79b40a24023310bac50a86b595208eb9502956e7ac5754ba1f7f"
         },
         {
           "target": ".github/workflows/new-project-governance.yml",
-          "sha256": "b41d0df4cb11de5bd1458976e0a1f69ee6733593cd9bb93d68fbbb7fe2e52929"
+          "sha256": "297606a400885f0a0d131de6df8d6fd6870940bdb5ecdd7f2f746fe77da033b9"
         },
         {
           "target": ".governance/AGENT_DECISIONS.md",
-          "sha256": "853c5282e44321cd5cd895f41627fc4c5bb98774cd6e726ee1ccf319582f8407"
+          "sha256": "bc511acb758aa7120d06f5f795eae820a02b868adcfef30377312f8c33dbb44a"
         },
         {
           "target": ".governance/adoption-bindings.json",
@@ -51,15 +63,15 @@
         },
         {
           "target": ".governance/agent-hosts.json",
-          "sha256": "d4565102018a634307d941173fdea5da04c2cce494a979199a463d318dab41a0"
+          "sha256": "d03e7bd5ed2941311a7917e4b26fd8a5ef38e809611ed2648b0fd3f290dc4d4c"
         },
         {
           "target": ".governance/agent-hosts.schema.json",
-          "sha256": "46a3e39eb35f5ad34363a5aa1394cc0db2304f48ee8d816c80615dc565c3c360"
+          "sha256": "4cda59d458f774490bada85d1c1b86167e71268cb1a2b8c9bd5126601ddfbb0b"
         },
         {
           "target": ".governance/agent_host_check.py",
-          "sha256": "a6d2103122163688b263a86bb0dfd9c8ec04274d59d2308b2afa44b89d92b0cb"
+          "sha256": "488e7ad3a65112dc4bb410dcd164d739fff25662621ba6bc166be921e003839e"
         },
         {
           "target": ".governance/approval-evidence.schema.json",
@@ -71,27 +83,35 @@
         },
         {
           "target": ".governance/branch_intent_reconciliation.py",
-          "sha256": "cf316043eaff77021183d64f5b6f8b291fb0c38b62a9bae7203845a8b35592ca"
+          "sha256": "752f824d2c4a59d6d30e8c044744ef1d398813519840fe20a97b0fdbefd701bd"
         },
         {
           "target": ".governance/branch_lifecycle_check.py",
-          "sha256": "bf354a796e23334b0a2eccfac26fac99f37e4e562adc85793188eca2aaaaf931"
+          "sha256": "faf18a9449ed13f805f5442174c3f7b6cf4077e8891670e81800d586b1622daa"
         },
         {
           "target": ".governance/change-evaluation.schema.json",
-          "sha256": "69af6aa537dd3957d9cdc6ff19edb1ac8c8710f798e5255219422547d84fa2d3"
+          "sha256": "0ac0908b551d0d36ec7007f5b23b888b6d11376ea450aae68068f1b0faa9060b"
         },
         {
           "target": ".governance/change-lease.schema.json",
-          "sha256": "f9b8eabf4d66ced63fbb1c5d8ae733f88bcf64016c8f9cf101eb4a17533406c6"
+          "sha256": "10c65de08424aca0e661ffabd61c3c2877296314f901de583548423650445877"
         },
         {
           "target": ".governance/change_lease_check.py",
-          "sha256": "33d3435fbf2057442a9d31a03b676862aee8506a2ff47c595cb41aa05ec6c491"
+          "sha256": "9c9402194b3ad785f48d7c31b1f9a5cd3257fd97e770ff7442d76e35ea9e0d33"
         },
         {
           "target": ".governance/check_required_checks.py",
-          "sha256": "6ca9980ad55a5677e938dd52c8647437296493eb0d57d775997526e6e96998af"
+          "sha256": "cb0b3a44b74c7b0fe8888c00ca149c4e680685f605ac7d95992997b6cf12d363"
+        },
+        {
+          "target": ".governance/continuity_namespace.py",
+          "sha256": "79993dbf80dcf55f8804cf24b5b4185de2fafd1320254301d4ca15a63c3351a8"
+        },
+        {
+          "target": ".governance/controller_store_compaction.py",
+          "sha256": "5cad4e84d8fdd2d4998896eff708e9a89477861f5533adebee04d74c0ebcb953"
         },
         {
           "target": ".governance/decision-record.schema.json",
@@ -99,11 +119,11 @@
         },
         {
           "target": ".governance/decision_record.py",
-          "sha256": "cc1fafe5ad4f6586188296ade2dac7d2aef4456f5ff2a36de8c399337d173878"
+          "sha256": "7127229c4ccb9014fef225ddb94304d1e91f7e041fc7fd7d36fcb568d66c4245"
         },
         {
           "target": ".governance/diagnostics.json",
-          "sha256": "59d4f78ceca65d2d163655a0fb0a826671fcdcd5c7e9394cda9ee2b33551cb72"
+          "sha256": "b6781acba2a375ea0909cc339949d4a26e0f675f08a6e3a6874bc3fe99c4bac0"
         },
         {
           "target": ".governance/diagnostics.schema.json",
@@ -115,31 +135,63 @@
         },
         {
           "target": ".governance/docs/LOCAL_CI_PUBLICATION.md",
-          "sha256": "f30b778c8dc777be302ff346d3dbd144fc3a02fc957b178cc600bbec1219fc64"
+          "sha256": "001ba246f985ab10d0e4bb70ca18b45a9f3c80b5af70718ec30f6dfecd54bff8"
+        },
+        {
+          "target": ".governance/docs/SNAPSHOT_MIGRATION.md",
+          "sha256": "c73fe642f48e6b1d54b36c9a5f55d2e2a93f8405389533733c26907bd69d6012"
+        },
+        {
+          "target": ".governance/docs/information/continuity-namespaces.md",
+          "sha256": "a4dd32fab072d3c609ba6ffb9681425565dca7578e86aa767df4c222e12dac9d"
         },
         {
           "target": ".governance/error/GOV-AGENT-HOST.md",
-          "sha256": "a3679a63e6346946382dc510a8454b5c1c2851e694f7b3f4b82473764153a90f"
+          "sha256": "abd836976efcbe048c6a04010ae02f88e3fe469cc3864fe6ae54acea82583a6a"
         },
         {
           "target": ".governance/error/GOV-APPROVAL.md",
           "sha256": "3b508f23491f2ad93e115481699fab84ef3def844f7580736c29c8afafb1ec47"
         },
         {
+          "target": ".governance/error/GOV-ARCHITECTURE-001.md",
+          "sha256": "33cabd81fbd1bede22a85b0f5c27897f56d8ec8bf3c43ae4ba37d8de145c9b90"
+        },
+        {
           "target": ".governance/error/GOV-CHANGE-LEASE.md",
-          "sha256": "30530e7fd7c2eca9f4db0adec575dbc9b1bea139c2a640bfde0ae7c4b2ace116"
+          "sha256": "778c9d7c09f8c53c2b6a7e29692ffae2150ffcac1dcda0c1c11f51346af5edb8"
+        },
+        {
+          "target": ".governance/error/GOV-HOST-MERGE.md",
+          "sha256": "59d4bf531c9d2d461fe23f8c8a3a6c5423a6051c0d6d5e1c9f35fb60f628fba3"
+        },
+        {
+          "target": ".governance/error/GOV-IDLE-TAKEOVER.md",
+          "sha256": "9426a5460368feb4e7c6caac73568709e6186d7abe09a05f27112daded8ac9d3"
         },
         {
           "target": ".governance/error/GOV-INTENT.md",
-          "sha256": "4dc29dbf4c39d18cd11a5ec1eccc257a06d2bea2f95b560aa58085672611d4a9"
+          "sha256": "c078852b4ebb868a0f49463e33df4db410e30989856c5cc5e2d3108289024f75"
         },
         {
           "target": ".governance/error/GOV-PACKAGING.md",
-          "sha256": "4a602c65a655e9b8b631487fa24982df00e0ae874cf5bdb5129f6493bb440c89"
+          "sha256": "a5ca878344c86fe9c0f4017aa8220d4dfd493870f5ef8bbdd6980d566f04efc6"
+        },
+        {
+          "target": ".governance/error/GOV-PHYS.md",
+          "sha256": "f10991e7cf35097a1328ed110c86039156e79b650facac8588cc6136b6d82e24"
+        },
+        {
+          "target": ".governance/error/GOV-PUSH.md",
+          "sha256": "d2f685b927ee637d3ac4a0c6a9d80582808627b542452e87f01df5d81400d620"
         },
         {
           "target": ".governance/error/GOV-REMEDIATION-INTENT.md",
           "sha256": "ff0f41bf5112a1808738554b51c13a24ce97f7842304f1aca33e9f9846d73aa3"
+        },
+        {
+          "target": ".governance/error/GOV-SNAPSHOT-MIGRATION.md",
+          "sha256": "b82f44800ce8470d7769cef8b4b4c46a70279cc1fffdbd6592cfbe43741b3cb4"
         },
         {
           "target": ".governance/error/GOV-STANDARD-UPDATE.md",
@@ -155,15 +207,19 @@
         },
         {
           "target": ".governance/error/GOV-TICKET-ALLOCATION.md",
-          "sha256": "09f92cac24bbbbe5c2967221497fb6b68b02bcd3bf4f56afe36d36ac7d7b0a58"
+          "sha256": "acc7386172dec6015773c179bc7cbe80ba4a84c686102a8a529ddaac15c55a9f"
+        },
+        {
+          "target": ".governance/error/GOV-VERSION.md",
+          "sha256": "b36de34adf8900f39e05ae2f92bfa892971143803fc263821728be587543ce0b"
         },
         {
           "target": ".governance/error/GOV-WORK-CONTINUITY.md",
-          "sha256": "de46a4adc51e8dd5880a83a6d9585ecdbbea4ae30a44ee6506c207ea2e8bc8eb"
+          "sha256": "56a5618043492186a1e3b12377c51011dc8518fb69632cc1dfb6390f56c1ae79"
         },
         {
           "target": ".governance/error/GOV-WORK-START.md",
-          "sha256": "93213ed96593bfa458b645e58c5e88fd805ce94655579e046e94d01dbde502f6"
+          "sha256": "e016dbaa6e1ec2b72292b9a34cda167e1a16e0be21969939743f5f62fbbe5f88"
         },
         {
           "target": ".governance/error/GOV-WORKSPACE-LIFECYCLE.md",
@@ -179,35 +235,59 @@
         },
         {
           "target": ".governance/generate_required_checks.py",
-          "sha256": "a017f06203e3c186dd97bc3c3a183e0352f5f11b2f49701e61cac98e86c00cba"
+          "sha256": "d6c188a1628b1e8b9b884b824d566f0a5fa9d02d0e480339e4d46e2cdcc6dc51"
         },
         {
           "target": ".governance/governance_check.py",
-          "sha256": "48a1cf1231031e6f1216ae556a4ca5434c1e3e775c246990e16d78708fe2176d"
+          "sha256": "4f4833f43be39cf18deacdec7198628a5db4f7530b8056d0c4e718de9882c5d3"
+        },
+        {
+          "target": ".governance/idle_takeover.py",
+          "sha256": "34314bab61967ae4372385c0437222f7930385d2eace0d4312571c985d407315"
         },
         {
           "target": ".governance/intent.schema.json",
-          "sha256": "7baa32440e3ae5bf1ada32359154b35038134ba2dee4dbf25d9435a12f62ab0c"
+          "sha256": "b0a75ee7b580425fd453a0bb93bfbd442930dadec625aef48bebae18e8e963a9"
         },
         {
           "target": ".governance/lock.schema.json",
           "sha256": "ad80c98f800a4a3310870336dcdaf0aa689cc4988f71084d25d76bea2df1242f"
         },
         {
+          "target": ".governance/managed-copies.json",
+          "sha256": "c94bb38d048d517d541ac8ad7fc47d3f531471d88c713634b1d5889fd8e871d7"
+        },
+        {
           "target": ".governance/manifest.base.json",
-          "sha256": "5d05bead54141c9430fda42b7a858b6184606b4dde686209e53f6c94b7121788"
+          "sha256": "95ce80ac6608c82bf8d70d842f9e38ab61b18e568f22fd5a578edab742fbe6a0"
         },
         {
           "target": ".governance/manifest.schema.json",
-          "sha256": "5aa2ccd3f6898834d4e39a78342448145490be56aa132e16ac7c9d64acef8f73"
+          "sha256": "2194aa771caa7d84d2f4b5b8bdd5b7c06182ffcd0cb910a86a8228326967a9da"
         },
         {
           "target": ".governance/package-manifest.json",
-          "sha256": "3ec6ab9c02fb7c632b1a081e43c89c9243bb181d74f7ddd54eb772e74694bf23"
+          "sha256": "b53452f119ec96d6ae3f5acbe8334b0ecd4a2d592e01aa6dfc141d7456769a59"
+        },
+        {
+          "target": ".governance/physical-contracts.schema.json",
+          "sha256": "df69632961d6936d961d9cba21e82e96dac96a8b52d9b3e36ed7e13e5a01b403"
+        },
+        {
+          "target": ".governance/policy-dsl.lock.json",
+          "sha256": "930b9d97998ab912c612872248608d880efa08ef74b6e6c2c4904c9ea0373138"
+        },
+        {
+          "target": ".governance/policy_dsl_check.py",
+          "sha256": "9bc02c1805ef208a5d136c045c6a829b7394bc652208c26942dd2e31561881ac"
         },
         {
           "target": ".governance/precommit_standard_update.py",
           "sha256": "c91e2bf9ae9d6ccc77bce0e61450c818a5961edee5bfde3b60426da88e296b0f"
+        },
+        {
+          "target": ".governance/prune_merged_worktrees.py",
+          "sha256": "32a88bf7df88195ed41659740daa114cfbbb8f0d3d8081aaab511d91b651b1fb"
         },
         {
           "target": ".governance/remediation-intent.schema.json",
@@ -219,15 +299,43 @@
         },
         {
           "target": ".governance/remediation_intent.py",
-          "sha256": "8b056e89622ebf636384f6272f731e3c3677ca7e2b07088d5d51a15b202765fc"
+          "sha256": "351e8c7bc86952ed6e5ebb90076c1627cf1770cda0e25787e46690d6b04dd22c"
+        },
+        {
+          "target": ".governance/repository_policy.py",
+          "sha256": "8c1cdee4250f0c3ce87c9613996c3a69095aa787bad4572d68876fecab31ad05"
         },
         {
           "target": ".governance/required-checks.schema.json",
-          "sha256": "465f004d0e30f21e60e59c8b7860cc33db059e383e272e3caa267df7f24437f5"
+          "sha256": "70675a17bf251c4a41a4483e27d76acb7379c6eea1f61abd52177493989c9683"
+        },
+        {
+          "target": ".governance/reusable-workflows.schema.json",
+          "sha256": "04c82369e8dff62ae580196ea64d2f8d28c10d4b097dc337a5bf59419a6fa4a1"
+        },
+        {
+          "target": ".governance/seed_baseline.py",
+          "sha256": "072ba0ee47a656e61b746c8c09f768d6264b6d2889c6b46c8537a8c9d3eccab7"
+        },
+        {
+          "target": ".governance/snapshot-migration.schema.json",
+          "sha256": "37e97ca683254a66d1a83576e3a4293e37663d38efb0cbc94e9deec1dd58b5ca"
+        },
+        {
+          "target": ".governance/snapshot_allocation.py",
+          "sha256": "31c7fa7f94139ab221be61e6f2011a433fe09b5c1712aa5c00ef8cf9b2d7b878"
+        },
+        {
+          "target": ".governance/snapshot_migration.py",
+          "sha256": "b030abe2d0bd8027f14bcf8182b55a403b0701aac8f24a5ce089c8adfc20cd44"
         },
         {
           "target": ".governance/stack-profiles.json",
           "sha256": "47a3b899553968dfc5e0565c0de525f13aadde5dacae4556614572a731054f0e"
+        },
+        {
+          "target": ".governance/standard-adoption-plan.schema.json",
+          "sha256": "4829ea370409f921eefe2624b40eb7157047e1ac27867a854c498cbf5de2b615"
         },
         {
           "target": ".governance/standard-adoption.schema.json",
@@ -235,11 +343,15 @@
         },
         {
           "target": ".governance/standard-packs.json",
-          "sha256": "107f9fcc6231c108b216055c63ba43e8bd5ec152ea7a2a5906642c3484fceed9"
+          "sha256": "02419af2fa2bde66e5ccf93ed58061d56db7be12a91b868ea3e5a82c7f0e0910"
+        },
+        {
+          "target": ".governance/standard-propagation-request.schema.json",
+          "sha256": "25b189eb11402137afc67d5a53c426a6b91e083dfa0ca03e720b0bbeebe33beb"
         },
         {
           "target": ".governance/standard_pack_check.py",
-          "sha256": "412316ef0b35fe1c5f389bc067193693b13c389b7ce9126d78630ebb927c8527"
+          "sha256": "e5bee4c152ab295125d0ddd069b2a92a08ecee76e117834e3d47d5a1506ffd86"
         },
         {
           "target": ".governance/templates/conftest-worktree-bootstrap.py",
@@ -248,6 +360,10 @@
         {
           "target": ".governance/terminal-receipt-registry.schema.json",
           "sha256": "799dac322e708421a1ff2dbb00408a47cd05f7021c87920d1d37a1e70fe671f9"
+        },
+        {
+          "target": ".governance/terminal_lease_release.py",
+          "sha256": "0a2efa0e191f4638d52d88f2e231bbcaa5e7297df6dd760bd435bbe7fb94b918"
         },
         {
           "target": ".governance/ticket-activity-override.schema.json",
@@ -263,31 +379,43 @@
         },
         {
           "target": ".governance/ticket-allocation-receipt.schema.json",
-          "sha256": "e3827eca95cdb833345964f0705a5aa8dc84c54cc369778bfb8b611419b191b2"
+          "sha256": "c1cf2107a127aa1051e8ea73faa463247fa1e571cb2722d2dbc7c60f6369383c"
         },
         {
           "target": ".governance/ticket-allocation-request.schema.json",
-          "sha256": "b3796ee4670bf78ab088f7a691edafe9630db2aa7a57663c12705ebc8c83df05"
+          "sha256": "4d38efa172b12411d88c824ba13210a19ecd75b84aa239961c520c3ce5aee2aa"
         },
         {
           "target": ".governance/ticket-allocation.schema.json",
-          "sha256": "bf05d64066f902a19f3d1d5359105c22b77c6538e27f29903f28c9b7a503fe13"
+          "sha256": "a0e92bb340ea6f6ffc1a292af1c13ab18b734c726cad8a3a28b3bf201630c6ca"
         },
         {
           "target": ".governance/ticket_activity.py",
-          "sha256": "c2672349d879d967634de3100377a6f0c45a116733a2edc52309d7a0577e7d7b"
+          "sha256": "114e7e299b0f0ff5f27f75c506fdd8abf3f4f1a03d4c9085f146db64d550c8cd"
         },
         {
           "target": ".governance/ticket_allocation.py",
-          "sha256": "dac1d84caf462866b22df3c8e84952053f976d60285c930e3888f8fa3f11ddbe"
+          "sha256": "06a9e1f2b986a2dddb1be44b769a8b1029f1d0c5f06fedc44a229646370ac0bf"
+        },
+        {
+          "target": ".governance/ticket_index_merge_driver.py",
+          "sha256": "478a6aa42fa9ef8733756c7adbb2a569dd109c9b79a0c2aa033ba67b083beeac"
         },
         {
           "target": ".governance/ticket_input.py",
-          "sha256": "b7fa667798e3a855f8c3504b78c652b549f15cd63a32b225e2ad67b9320f0d5e"
+          "sha256": "cb515f4af5585514c4ece6cf1de495eb74be832c3381914ea0f3faef8470d2c7"
+        },
+        {
+          "target": ".governance/ticket_recovery.py",
+          "sha256": "caea6250331c9d93c8e5f28a4934b438daeb73b4966d568c1a2774980c2915df"
+        },
+        {
+          "target": ".governance/ticket_restoration.py",
+          "sha256": "7ca146d50318c6b98eaf361c6043523b652b6178389c63f9e777af558e2c44ef"
         },
         {
           "target": ".governance/ticket_storage.py",
-          "sha256": "399328bbced61d9b205a5a5257decb2f312d40f29280b3536bd4f593d478a26e"
+          "sha256": "b23f5e21001fefda10937085b267ac4cf5939f85399bd715ac669ae139a054ee"
         },
         {
           "target": ".governance/work-classification.dsl.json",
@@ -303,39 +431,39 @@
         },
         {
           "target": ".governance/work-start-report.schema.json",
-          "sha256": "754052876760ab11204a7991aa750241e60e21bec92b9544f93a76d3c3d0f5d0"
+          "sha256": "f6744ed44359a892f44cfdc8c825182a2ba72b855ec3aadce244327e7771ba51"
         },
         {
           "target": ".governance/work_continuity.py",
-          "sha256": "43402de7e0a899bdeb284dbf2535032b59517d697eafc057c38d03691afd5e92"
+          "sha256": "10e2dc8ea71b3448be203c6f24ca00ebc8b1683c096e6845a8690d098ba4f63b"
         },
         {
           "target": ".governance/work_start_check.py",
-          "sha256": "ebe2795f8a790be46a4d766f8a2315af7c7ea8f311ca1f7715488fd8dd00301d"
+          "sha256": "bdf54f7958ffdc93bc0fc4825c170152cf9725d5f91f54fb1f7dc6a8f5668805"
         },
         {
           "target": ".governance/workspace_lifecycle_check.py",
-          "sha256": "9b800de09bf4c518f41f9c6d79c9145f488cdf2b9183eed1ccf68298fb33cc0e"
+          "sha256": "f264154a69c2c00a9218e6dbff87dcf2a3179768d94b4086374f001da6aa411f"
         },
         {
           "target": ".governance/worktree_guard.py",
-          "sha256": "b154f6e67626770ec11c9544d31a27b32d9c215ef73ffc9eb8f52e9c3a9b051b"
+          "sha256": "16408421c577a8c2eedd24800b69c116b3af11a4046d9533a470d67e4e4d0f4a"
         },
         {
           "target": ".governance/worktree_overlap_check.py",
-          "sha256": "a7d17aa36344cbf644437e5f5d3b9dc4d8a264863bae2e80198b147f21d4b84d"
+          "sha256": "14fb26def02790454a90fbd776df3a2b5c0551a55e8f2b32a174515f15670169"
         },
         {
           "target": ".governance/worktree_path_check.py",
-          "sha256": "fad10912f3b14913cc348880996b636ba0d31ea66a853dd264b53e4e66f17feb"
+          "sha256": "106f91e6398564b96d5487dbd981ebb2078d7d366b327400b7d08467fa04c1fd"
         },
         {
           "target": ".governance/worktrees.lock.json",
-          "sha256": "5d42f7a7a1afc319dd8f670730f564271d886e22fe7ea61dd0d12911e7ce05ca"
+          "sha256": "da34dceef6573250b03ac471867f95d6cf4a96f2cb729df61efed51283c52f2c"
         },
         {
           "target": ".governance/worktrees.schema.json",
-          "sha256": "bb5989c19ee33d9beafa34576ef568ef70384a664ccf763ac2e29dde3a464756"
+          "sha256": "6b57184758bdceda5cd5ea98889427af1a762dd0afe801ac8e1279d26ccb2cb8"
         },
         {
           "target": ".subactor/.gitignore",
@@ -347,64 +475,64 @@
         },
         {
           "target": "AGENTS.md",
-          "sha256": "ba1e764c1faff4560ed881ffdbb3bfebb1a5ab113ff998ee77d43155bc56a5d3"
+          "sha256": "2273a46935c48f01ffc14be4ddb5d1de4a1de8118dec823b2fd769625870f1f0"
         },
         {
           "target": "CLAUDE.md",
-          "sha256": "48c8159bd17f0a7ab05989ee06e3aeec0aab07f64347fcc271140d9f650d7713"
+          "sha256": "628e743294cd4e23531eece8053595fec526080b20f2fac74248e43e5227442b"
         },
         {
           "target": "GEMINI.md",
-          "sha256": "b66a7d12c4c877110eb263a80b32c065c4c2d581743d72cd6e06ebbe6dc842da"
+          "sha256": "f72a35f8a888b1727f4829fa33410e75a1e830a363cc7bf7c465e5c519535725"
         },
         {
           "target": "project/governance-check.bat",
-          "sha256": "04f4fd3ba15abd6b874bde8fab0dd869402b84b9c83ae72da40c1a804b068045"
+          "sha256": "5ece7d85b011a1421bea0b6a5359a9b95ab878c96254f8143979cbcd5adaf76a"
         },
         {
           "target": "project/governance-check.sh",
-          "sha256": "8eb977ff01a96e47455d227ed5ced949eb53ea19537f870d9016f803840e048e"
+          "sha256": "961deddc05c5cbecbaf72a76503ed6bba94ea2b9096ea83381fb7365932a9ca8"
         },
         {
           "target": "project/new-ticket.sh",
-          "sha256": "1eb5784f229c8c68417788e1753f013c0ca3d1164e510cd5ee294bf326044dd7"
+          "sha256": "ad8d7ab3d41f38b46ddd3549cae2200846dbf8cf408672b2637a9c2dc2095898"
         },
         {
           "target": "project/readme.sh",
-          "sha256": "b41a9c88374e6de0439284a4561fb11b1b482039bc5ba1bcf6683fd59b1a3968"
+          "sha256": "21474eb3aafc34b36eed596e785c5e2bb4fefed0b13c2bd2e617f3269ec3fe9a"
         },
         {
           "target": "scripts/install-agent-hosts.sh",
-          "sha256": "316a4dd6c877ba8f79a10bb761b188378deb8aea70fb7fcc54a729c664987f44"
+          "sha256": "380e0e7eebffaa1c8d17f5a53afb0cbd02960eb6f6478bf1736664f6080033b6"
         },
         {
           "target": "scripts/runtime.sh",
-          "sha256": "27ec7c0ff9ba3e16be5438ce2fd938a0e1dd34cc3a3627bf97155a83f4304306"
+          "sha256": "057d6b06de069f57abfdcad8e53c784c651bab7787c7a30053c8243aca8a5c34"
         },
         {
           "target": "wellmanifest_governance.py",
-          "sha256": "d6b71f091ffd88fb30c96f54162020d9aeb6e54555328834b68ccb21868ecc07"
+          "sha256": "2c63a4af5b2b92c37df27a5d2d1c5644bfbb216133d858f85701555c64c6b8cf"
         },
         {
           "target": "worktree-guard.yaml",
-          "sha256": "bea3d3cda9bd764f9e79b975da8f5360df894fdc04fca0407def88ebd49111b7"
+          "sha256": "8533a7c03a121a6df68b89cab212187313ffb0720aaf457941439148a25c3345"
         }
       ],
       "evidence": [
         {
           "level": "S0",
-          "uri": "https://raw.githubusercontent.com/wellmanifest/new-project/a4178b9cf6fa12540ee7406d7f38391dd4fa1f30/POLICY.md",
-          "sha256": "69519ad09560a634df038257d6d940a5977489ac5c4aa7f6d424d6861ffd984f"
+          "uri": "https://raw.githubusercontent.com/wellmanifest/new-project/7ac3106162c9e7a9761b4ae6726511eb8935f87a/POLICY.md",
+          "sha256": "d7f26528b0d3d24ded62abd56aa04388c03823f78314a6b1d9fa68b3dc975db5"
         },
         {
           "level": "S1",
-          "uri": "https://raw.githubusercontent.com/wellmanifest/new-project/a4178b9cf6fa12540ee7406d7f38391dd4fa1f30/scripts/governance_check.py",
-          "sha256": "48a1cf1231031e6f1216ae556a4ca5434c1e3e775c246990e16d78708fe2176d"
+          "uri": "https://raw.githubusercontent.com/wellmanifest/new-project/7ac3106162c9e7a9761b4ae6726511eb8935f87a/scripts/governance_check.py",
+          "sha256": "4f4833f43be39cf18deacdec7198628a5db4f7530b8056d0c4e718de9882c5d3"
         },
         {
           "level": "S2",
           "uri": "./.governance/manifest.lock.json",
-          "sha256": "4214c710566e77ee54946ce786f9809705a6ee72e9014dea796375beaa3661a3"
+          "sha256": "89603fc1de4d4e0c4dc354fc5e41c3aeec6e6ed90526ecd5a04e91cd72af1585"
         }
       ]
     }
