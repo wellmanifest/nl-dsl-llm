@@ -70,7 +70,8 @@
           ".subactor/**",
           ".gitattributes",
           "errors/**",
-          "src/paxlet_nl_dsl_llm/__init__.py"
+          "src/paxlet_nl_dsl_llm/__init__.py",
+          ".github/workflows/ci.yml"
         ]
       },
       "infrastructure": {

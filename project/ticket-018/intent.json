@@ -107,7 +107,8 @@
     ".governance/standard-adoption.json",
     ".governance/ticket-activity.override.json",
     "errors/README.md",
-    "src/paxlet_nl_dsl_llm/__init__.py"
+    "src/paxlet_nl_dsl_llm/__init__.py",
+    ".github/workflows/ci.yml"
   ],
   "forbiddenPaths": [
     "project/ticket-*/user-*.md"
