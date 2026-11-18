@@ -1,0 +1,120 @@
+{
+  "schema": "new-project.intent/v3",
+  "ticket": "ticket-019",
+  "summary": "Adopt new-project 0.20.162",
+  "workstream": "governance",
+  "classification": {
+    "kind": "BUG",
+    "priority": "P1",
+    "origin": "regression"
+  },
+  "allowedPaths": [
+    "project/ticket-019/**",
+    "TODO.md",
+    "project/TICKETS.md",
+    ".githooks/pre-commit",
+    ".governance/bootstrap_packaging_scope.py",
+    ".governance/error/GOV-CHANGE-LEASE.md",
+    ".governance/error/GOV-WORK-START.md",
+    ".governance/governance_check.py",
+    ".governance/legacy_terminal_retirement.py",
+    ".governance/managed-copies.json",
+    ".governance/manifest.base.json",
+    ".governance/manifest.json",
+    ".governance/manifest.lock.json",
+    ".governance/owner_handoff.py",
+    ".governance/package-manifest.json",
+    ".governance/prune_merged_worktrees.py",
+    ".governance/standard-adoption.json",
+    ".governance/standard-packs.json",
+    ".governance/terminal_lease_release.py",
+    ".governance/work_start_check.py",
+    "project/new-ticket.sh",
+    "pyproject.toml"
+  ],
+  "forbiddenPaths": [
+    "project/ticket-*/user-*.md"
+  ],
+  "stacks": [],
+  "dependsOn": [],
+  "conflictsWith": [],
+  "integrationTicket": null,
+  "delivery": {
+    "acceptedBaseSha": "02b4e486c7c0fd07fe28fc13b1f5a798346e9107",
+    "targetBranch": "main",
+    "outcome": "Adopt wellmanifest/new-project 0.20.162 with the official Goal generator; standard records hold only verifiable evidence.",
+    "nonGoals": [
+      "No manual editing of lock digests or managed copies.",
+      "No product code changes.",
+      "No unproven S4/S5 claims."
+    ],
+    "complexity": "L",
+    "estimatedMinutes": 60,
+    "standardAdoption": {
+      "sourceRepository": "wellmanifest/new-project",
+      "fromRevision": "7ac3106162c9e7a9761b4ae6726511eb8935f87a",
+      "toRevision": "8e6b51dc91a2ac7e1e771908e0fac5e12da0b9a0"
+    },
+    "budgets": {
+      "maxImplementationFiles": 15,
+      "maxAffectedComponents": 5,
+      "maxPublicInterfaceChanges": 3,
+      "maxRuntimeDependencies": 3
+    },
+    "architecture": {
+      "status": "accepted",
+      "decision": "Goal generates the managed 0.20.162 set; target-owned standard records are rebuilt from verifiable evidence in audit mode.",
+      "components": [
+        {
+          "name": "governance-adoption",
+          "paths": [
+            ".githooks/pre-commit",
+            ".governance/bootstrap_packaging_scope.py",
+            ".governance/error/GOV-CHANGE-LEASE.md",
+            ".governance/error/GOV-WORK-START.md",
+            ".governance/governance_check.py",
+            ".governance/legacy_terminal_retirement.py",
+            ".governance/managed-copies.json",
+            ".governance/manifest.base.json",
+            ".governance/manifest.json",
+            ".governance/manifest.lock.json",
+            ".governance/owner_handoff.py",
+            ".governance/package-manifest.json",
+            ".governance/prune_merged_worktrees.py",
+            ".governance/standard-adoption.json",
+            ".governance/standard-packs.json",
+            ".governance/terminal_lease_release.py",
+            ".governance/work_start_check.py",
+            "pyproject.toml"
+          ]
+        }
+      ],
+      "responsibilityChanges": false,
+      "interfaceChanges": [],
+      "dataChanges": [],
+      "ui": {
+        "impact": "none",
+        "states": [],
+        "evidence": []
+      },
+      "rollback": "Restore accepted base 02b4e486c7c0fd07fe28fc13b1f5a798346e9107; no runtime data is migrated."
+    },
+    "runtimeDependencies": [],
+    "validation": [
+      {
+        "criterion": "AC-1",
+        "commands": [
+          "goal governance adopt --target-root . --source-revision 8e6b51dc91a2ac7e1e771908e0fac5e12da0b9a0 --check"
+        ],
+        "evidence": "Goal reports the target up-to-date at 0.20.162."
+      },
+      {
+        "criterion": "AC-2",
+        "commands": [
+          "bash project/governance-check.sh"
+        ],
+        "evidence": "The governance gate passes."
+      }
+    ]
+  }
+}

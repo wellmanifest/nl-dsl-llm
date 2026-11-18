@@ -35,6 +35,22 @@ The invoking session supplies `NEW_PROJECT_WRITER_ACTOR` and
 `NEW_PROJECT_WRITER_SESSION`; applying requires them to match the request and
 the current lease. The controller API takes that caller context separately.
 
+When the original writer session has already exited after verified terminal
+delivery (`releasesReservation: true`), the local-single-clone controller may
+settle eligible leases (`claimed`, `editing`, `validating`, `approved`,
+`merged`, `closed`) without impersonating the former writer session:
+
+```sh
+python .governance/terminal_lease_release.py --root . --settle-verified
+python .governance/terminal_lease_release.py --root . --settle-verified --apply
+python .governance/terminal_lease_release.py --root . --settle-verified --ticket ticket-123 --apply
+```
+
+Controller settlement requires an unambiguous verified terminal receipt on
+`targetBranch`, clean or already-removed checkout ancestry, and exclusive lease
+CAS, writing an immutable receipt under `.subactor/receipts/terminal-owner-release/`
+with `"settledBy": "controller:verified-terminal-receipt"`.
+
 The controller rechecks owner, bytes, fencing, clean delivery checkout and
 source ancestry, uses canonical transitions and increments fencing. An active
 local claim is explicitly cancelled before release; an already approved or
