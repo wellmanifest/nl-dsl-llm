@@ -588,8 +588,10 @@ if [[ -n "$BOOTSTRAP_ADOPTION_DIGEST" ]]; then
     echo "GOV-WORK-START-001: bootstrap acknowledgement requires exclusive first bounded file allocation." >&2
     exit 3
   fi
+fi
+if [[ -n "$TICKET_STORAGE_HELPER" && -f "$TICKET_STORAGE_HELPER" ]]; then
   # Keep the validated bridge for metadata rendering after entering the new
-  # checkout; its base deliberately does not yet contain native governance.
+  # checkout; its base may not yet contain native governance.
   TICKET_STORAGE_HELPER="$(cd "$(dirname "$TICKET_STORAGE_HELPER")" && pwd -P)/$(basename "$TICKET_STORAGE_HELPER")"
 fi
 
@@ -1012,8 +1014,13 @@ for key in ("branch", "worktreePath", "leasePath"):
   ticket_dir="project/$ticket_id"
 fi
 
-if [[ -n "$BOOTSTRAP_ADOPTION_DIGEST" ]]; then
-  mkdir -p project
+ticket_parent="$(dirname "$ticket_dir")"
+if [[ "$ticket_parent" != "." ]]; then
+  if [[ -L "$ticket_parent" || ( -e "$ticket_parent" && ! -d "$ticket_parent" ) ]]; then
+    echo "GOV-TICKET-LOCK-003: ticket directory already exists or cannot be created: $ticket_dir" >&2
+    exit 4
+  fi
+  mkdir -p "$ticket_parent"
 fi
 
 if ! mkdir "$ticket_dir" 2>/dev/null; then
@@ -1134,7 +1141,7 @@ intent["allowedPaths"] = [f"project/{ticket}/**", "TODO.md", "project/TICKETS.md
 intent["delivery"] = projection["delivery"]
 Path(path).write_text(json.dumps(intent, indent=2) + "\n")
 PYADOPTIONINTENT
-  elif [[ -n "$BOOTSTRAP_ADOPTION_DIGEST" ]]; then
+  elif [[ -n "$BOOTSTRAP_ADOPTION_DIGEST" || ! -f .governance/manifest.base.json ]]; then
     # The identical scope was validated against primary before reservation.
     # Only generated ticket metadata is written here, never adoption/source.
     python3 - "$ticket_dir/intent.json" "$ticket_id" "$WORKSTREAM" "${SCOPE_ARGUMENTS[@]}" <<'PYBOOT'

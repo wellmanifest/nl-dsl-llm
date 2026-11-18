@@ -273,6 +273,24 @@ def bootstrap_historical_refs(root, head):
     return refs
 
 
+WELLMAN_SCAFFOLD_PROFILES = frozenset({
+    "wellmanifest/new-project",
+    "profile:baseline",
+    "profile:domain-pack",
+    "profile:runtime-service",
+    "profile:agent-executor",
+    "profile:deployment",
+    "profile:embedded-fleet",
+    "profile:full",
+})
+WELLMAN_SCAFFOLD_VERSION_RE = re.compile(
+    r"\A(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)"
+    r"(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?\Z"
+)
+
+
 def bootstrap_scaffold_at_head(root, head):
     """Verify committed legacy provenance, or prove governance was absent.
 
@@ -292,9 +310,51 @@ def bootstrap_scaffold_at_head(root, head):
     if (not isinstance(original, dict) or set(original) != {"schema", "standard"}
             or original.get("schema") != "wellmanifest.manifest/v1"
             or not isinstance(standard, dict) or set(standard) != {"id", "version"}
-            or standard.get("id") != "profile:baseline"
-            or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", str(standard.get("version", "")))):
+            or standard.get("id") not in WELLMAN_SCAFFOLD_PROFILES
+            or not isinstance(standard.get("version"), str)
+            or not WELLMAN_SCAFFOLD_VERSION_RE.fullmatch(standard["version"])):
         raise ObservationError("Bootstrap requires an exact legacy scaffold")
+
+
+def bootstrap_preserved_worktrees(root, head):
+    """Observe canonical integrated checkouts; never retire or take over them.
+
+    The existing historical-ref lease check remains independently required.
+    Callers compare repeated observations; cleanliness is not writer authority.
+    """
+    inventory = worktrees(root)
+    if Path(inventory[0]["worktree"]) != root:
+        raise ObservationError("Bootstrap requires the registered primary checkout")
+    common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+    observed = []
+    for item in inventory[1:]:
+        branch = item.get("branch", "")
+        match = re.fullmatch(r"refs/heads/ticket/([0-9]{3,})-([a-z0-9]+(?:-[a-z0-9]+)*)", branch)
+        path = Path(item["worktree"])
+        if (not match or set(item) != {"worktree", "HEAD", "branch"}
+                or path != root / ".worktrees" / f"ticket-{match[1]}--{match[2]}"
+                or any(p.is_symlink() for p in (path, *path.parents))
+                or not path.is_dir()):
+            raise ObservationError("Bootstrap worktree is not a preserved canonical checkout")
+        sha = git(path, "rev-parse", "HEAD").strip()
+        if (sha != item["HEAD"] or sha == head
+                or git(root, "merge-base", head, sha).strip() != sha
+                or git(root, "rev-parse", branch).strip() != sha
+                or git(path, "symbolic-ref", "HEAD").strip() != branch
+                or Path(git(path, "rev-parse", "--show-toplevel").strip()) != path
+                or git(path, "rev-parse", "--path-format=absolute", "--git-common-dir").strip() != common):
+            raise ObservationError("Bootstrap worktree bindings are not strictly integrated")
+        # Non-default index flags and ignored submodules must not hide changes.
+        flags = git(path, "ls-files", "-v", "-z").split("\0")
+        if (any(field and field[0] != "H" for field in flags)
+                or git(path, "status", "--porcelain=v1", "--untracked-files=all",
+                       "--ignore-submodules=none")):
+            raise ObservationError("Bootstrap preserved worktree is not observably clean")
+        _, checksum, dirty = dirty_observation(path)
+        if dirty:
+            raise ObservationError("Bootstrap preserved worktree changed during observation")
+        observed.append({"registration": item, "dirtyDigest": checksum})
+    return {"inventory": inventory, "preserved": observed}
 
 
 def bootstrap_owned_paths(root, manifest, expected_digest):
@@ -326,10 +386,11 @@ def bootstrap_owned_paths(root, manifest, expected_digest):
         bootstrap_scaffold_at_head(root, head)
     else:
         raise ObservationError("Unknown bootstrap kind")
-    if (len(worktrees(root)) != 1
-            or (Path(common) / "new-project-ticket-high-water").exists()):
+    high_water = Path(common) / "new-project-ticket-high-water"
+    if high_water.exists() or high_water.is_symlink():
         raise ObservationError("Bootstrap acknowledgement is first-allocation only")
     historical_refs = bootstrap_historical_refs(root, head)
+    preserved_worktrees = bootstrap_preserved_worktrees(root, head)
     if kind == "fresh":
         unchanged_committed_legacy_carriers(root, head)
     elif list((root / "project").glob("ticket-*")):
@@ -362,8 +423,8 @@ def bootstrap_owned_paths(root, manifest, expected_digest):
     verify_bootstrap_files()
     if (git(root, "rev-parse", "HEAD").strip() != head
             or bootstrap_historical_refs(root, head) != historical_refs
-            or len(worktrees(root)) != 1
-            or (Path(common) / "new-project-ticket-high-water").exists()):
+            or bootstrap_preserved_worktrees(root, head) != preserved_worktrees
+            or high_water.exists() or high_water.is_symlink()):
         raise ObservationError("Bootstrap allocation state changed during observation")
     _, final_digest, final_dirty = dirty_observation(root)
     if final_digest != expected_digest or final_dirty != dirty:

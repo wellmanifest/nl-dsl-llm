@@ -2,8 +2,26 @@
   "schema": "new-project.package-manifest/v1",
   "files": [
     {
+      "source": "scripts/bootstrap_packaging_scope.py",
+      "target": ".governance/bootstrap_packaging_scope.py",
+      "strategy": "managed",
+      "executable": true
+    },
+    {
+      "source": "scripts/legacy_terminal_retirement.py",
+      "target": ".governance/legacy_terminal_retirement.py",
+      "strategy": "managed",
+      "executable": true
+    },
+    {
       "source": "scripts/terminal_lease_release.py",
       "target": ".governance/terminal_lease_release.py",
+      "strategy": "managed",
+      "executable": true
+    },
+    {
+      "source": "scripts/owner_handoff.py",
+      "target": ".governance/owner_handoff.py",
       "strategy": "managed",
       "executable": true
     },
